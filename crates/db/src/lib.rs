@@ -74,12 +74,14 @@ async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), DbError> {
 
     // Migration 002: Add worktree fields
     // Check if columns exist before adding
-    let columns: Vec<(String,)> = sqlx::query_as("PRAGMA table_info(tasks)")
+    // PRAGMA table_info returns: (cid, name, type, notnull, dflt_value, pk)
+    let columns: Vec<(i64, String, String, i64, Option<String>, i64)> =
+        sqlx::query_as("PRAGMA table_info(tasks)")
         .fetch_all(pool)
         .await
         .map_err(|e| DbError::Migration(e.to_string()))?;
 
-    let column_names: Vec<&str> = columns.iter().map(|(n,)| n.as_str()).collect();
+    let column_names: Vec<&str> = columns.iter().map(|(_, name, _, _, _, _)| name.as_str()).collect();
 
     if !column_names.contains(&"branch_name") {
         sqlx::query("ALTER TABLE tasks ADD COLUMN branch_name TEXT")

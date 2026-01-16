@@ -33,3 +33,10 @@ Thumbs.db
 
 # Reference code (not part of project)
 vibe-kanban-ref/
+
+# Test results
+frontend/test-results/
+frontend/playwright-report/
+
+# Claude local settings
+.claude/settings.local.json

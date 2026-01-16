@@ -29,23 +29,23 @@ test.describe('eval-kanban', () => {
     test('should open create task modal when clicking New Task', async ({ page }) => {
       await page.getByRole('button', { name: /New Task/i }).click();
 
-      await expect(page.getByRole('heading', { name: 'Create Task' })).toBeVisible();
-      await expect(page.getByPlaceholder('Task title')).toBeVisible();
-      await expect(page.getByPlaceholder('Task description (optional)')).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'New Task' })).toBeVisible();
+      await expect(page.getByPlaceholder('Task title...')).toBeVisible();
+      await expect(page.getByPlaceholder('Describe the task for Claude...')).toBeVisible();
     });
 
     test('should close modal when clicking Cancel', async ({ page }) => {
       await page.getByRole('button', { name: /New Task/i }).click();
-      await expect(page.getByRole('heading', { name: 'Create Task' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'New Task' })).toBeVisible();
 
       await page.getByRole('button', { name: 'Cancel' }).click();
-      await expect(page.getByRole('heading', { name: 'Create Task' })).not.toBeVisible();
+      await expect(page.getByRole('heading', { name: 'New Task' })).not.toBeVisible();
     });
 
     test('should show validation error for empty title', async ({ page }) => {
       await page.getByRole('button', { name: /New Task/i }).click();
 
-      await page.getByRole('button', { name: 'Create' }).click();
+      await page.getByRole('button', { name: 'Create Task' }).click();
 
       await expect(page.getByText('Title is required')).toBeVisible();
     });
@@ -54,11 +54,11 @@ test.describe('eval-kanban', () => {
       const taskTitle = `Test Task ${Date.now()}`;
 
       await page.getByRole('button', { name: /New Task/i }).click();
-      await page.getByPlaceholder('Task title').fill(taskTitle);
-      await page.getByPlaceholder('Task description (optional)').fill('Test description');
-      await page.getByRole('button', { name: 'Create' }).click();
+      await page.getByPlaceholder('Task title...').fill(taskTitle);
+      await page.getByPlaceholder('Describe the task for Claude...').fill('Test description');
+      await page.getByRole('button', { name: 'Create Task' }).click();
 
-      await expect(page.getByRole('heading', { name: 'Create Task' })).not.toBeVisible();
+      await expect(page.getByRole('heading', { name: 'New Task' })).not.toBeVisible();
       await expect(page.getByText(taskTitle)).toBeVisible();
     });
   });
@@ -68,14 +68,15 @@ test.describe('eval-kanban', () => {
       const taskTitle = `Delete Test ${Date.now()}`;
 
       await page.getByRole('button', { name: /New Task/i }).click();
-      await page.getByPlaceholder('Task title').fill(taskTitle);
-      await page.getByRole('button', { name: 'Create' }).click();
+      await page.getByPlaceholder('Task title...').fill(taskTitle);
+      await page.getByRole('button', { name: 'Create Task' }).click();
 
       await expect(page.getByText(taskTitle)).toBeVisible();
 
       page.on('dialog', (dialog) => dialog.accept());
 
-      const taskCard = page.locator('div').filter({ hasText: taskTitle }).first();
+      // Find the task card by its title h3, go up to the task card div, and click Delete
+      const taskCard = page.locator('h3', { hasText: taskTitle }).locator('..').locator('..');
       await taskCard.getByRole('button', { name: 'Delete' }).click();
 
       await expect(page.getByText(taskTitle)).not.toBeVisible();
@@ -87,12 +88,13 @@ test.describe('eval-kanban', () => {
       const taskTitle = `Start Test ${Date.now()}`;
 
       await page.getByRole('button', { name: /New Task/i }).click();
-      await page.getByPlaceholder('Task title').fill(taskTitle);
-      await page.getByRole('button', { name: 'Create' }).click();
+      await page.getByPlaceholder('Task title...').fill(taskTitle);
+      await page.getByRole('button', { name: 'Create Task' }).click();
 
       await expect(page.getByText(taskTitle)).toBeVisible();
 
-      const taskCard = page.locator('div').filter({ hasText: taskTitle }).first();
+      // Find the task card by its title h3 and check for Start button
+      const taskCard = page.locator('h3', { hasText: taskTitle }).locator('..').locator('..');
       await expect(taskCard.getByRole('button', { name: 'Start' })).toBeVisible();
     });
   });

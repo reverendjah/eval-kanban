@@ -96,9 +96,3 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
         _ = receive_task => {}
     }
 }
-
-impl Clone for broadcast::Receiver<WsMessage> {
-    fn clone(&self) -> Self {
-        self.resubscribe()
-    }
-}
