@@ -68,6 +68,7 @@ impl ClaudeExecutor {
             "--print",
             "--output-format", "stream-json",
             "--verbose",
+            "--dangerously-skip-permissions",
         ])
         .arg(prompt)
         .current_dir(&self.working_dir)
