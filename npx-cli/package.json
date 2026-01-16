@@ -1,0 +1,33 @@
+{
+  "name": "eval-kanban",
+  "version": "0.1.0",
+  "description": "Kanban board for orchestrating tasks with Claude Code",
+  "bin": {
+    "eval-kanban": "./bin/cli.js"
+  },
+  "scripts": {
+    "start": "node bin/cli.js"
+  },
+  "keywords": [
+    "claude",
+    "kanban",
+    "ai",
+    "cli",
+    "automation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "bin"
+  ],
+  "dependencies": {
+    "adm-zip": "^0.5.16"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/reverendjah/eval-kanban.git"
+  }
+}

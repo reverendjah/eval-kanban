@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "Bash(git clone:*)",
+      "Bash(npx kakaroto-config:*)",
+      "WebSearch",
+      "mcp__memory__search_nodes",
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(cargo check:*)",
+      "Bash(npm install)",
+      "Bash(npm run build:*)",
+      "Bash(npm test:*)",
+      "Bash(cargo build:*)",
+      "Bash(cmd /c \"cd /d C:\\\\Claude\\\\evalUI && cargo build\")",
+      "Bash(powershell -Command \"cd ''C:\\\\Claude\\\\evalUI''; cargo build 2>&1\")",
+      "Bash(dir C:ClaudeevalUI)",
+      "Bash(dir \"C:\\\\Claude\\\\evalUI\\\\frontend\")",
+      "Bash(dir:*)",
+      "Bash(cat:*)",
+      "Bash(npm install:*)",
+      "Bash(npx playwright install:*)",
+      "Bash(npm run test:e2e:*)",
+      "Bash(curl:*)",
+      "Bash(where cargo:*)",
+      "Bash(winget install:*)",
+      "Bash(\"$USERPROFILE/.cargo/bin/cargo\" --version)",
+      "Bash(\"$HOME/.cargo/bin/cargo\" --version)",
+      "Bash(\"$USERPROFILE/.cargo/bin/cargo\" build --release)",
+      "Bash(git init:*)",
+      "Bash(git remote add:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

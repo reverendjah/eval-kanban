@@ -1,0 +1,10 @@
+[package]
+name = "eval-kanban-worktree"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+git2 = { workspace = true }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
