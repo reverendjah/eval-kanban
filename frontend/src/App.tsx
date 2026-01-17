@@ -115,7 +115,7 @@ function App() {
       <header className="border-b border-gray-700 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold text-white">eval-kanban</h1>
+            <h1 className="text-2xl font-bold text-white">eval-kanban 🎉</h1>
             <span
               className={`h-2 w-2 rounded-full ${
                 isConnected ? 'bg-green-500' : 'bg-red-500'
