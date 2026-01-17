@@ -5,6 +5,12 @@ import {
   TasksResponseSchema,
   TaskSchema,
 } from '../types/task';
+import {
+  DiffResponse,
+  DiffResponseSchema,
+  PreviewInfo,
+  PreviewInfoSchema,
+} from '../types/review';
 
 const API_BASE = '/api';
 
@@ -22,6 +28,13 @@ async function handleResponse<T>(response: Response, schema: { parse: (data: unk
   }
   const data = await response.json();
   return schema.parse(data);
+}
+
+async function handleVoidResponse(response: Response): Promise<void> {
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new ApiError(response.status, error.error || 'Request failed');
+  }
 }
 
 export const api = {
@@ -59,10 +72,7 @@ export const api = {
       const response = await fetch(`${API_BASE}/tasks/${id}`, {
         method: 'DELETE',
       });
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new ApiError(response.status, error.error || 'Request failed');
-      }
+      await handleVoidResponse(response);
     },
 
     start: async (id: string): Promise<Task> => {
@@ -77,6 +87,34 @@ export const api = {
         method: 'POST',
       });
       return handleResponse(response, TaskSchema);
+    },
+  },
+
+  diff: {
+    get: async (taskId: string): Promise<DiffResponse> => {
+      const response = await fetch(`${API_BASE}/tasks/${taskId}/diff`);
+      return handleResponse(response, DiffResponseSchema);
+    },
+  },
+
+  preview: {
+    start: async (taskId: string): Promise<PreviewInfo> => {
+      const response = await fetch(`${API_BASE}/tasks/${taskId}/preview`, {
+        method: 'POST',
+      });
+      return handleResponse(response, PreviewInfoSchema);
+    },
+
+    stop: async (taskId: string): Promise<void> => {
+      const response = await fetch(`${API_BASE}/tasks/${taskId}/preview`, {
+        method: 'DELETE',
+      });
+      await handleVoidResponse(response);
+    },
+
+    status: async (taskId: string): Promise<PreviewInfo> => {
+      const response = await fetch(`${API_BASE}/tasks/${taskId}/preview`);
+      return handleResponse(response, PreviewInfoSchema);
     },
   },
 };

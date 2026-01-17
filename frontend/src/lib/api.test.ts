@@ -212,3 +212,162 @@ describe('ApiError', () => {
     expect(error.name).toBe('ApiError');
   });
 });
+
+describe('api.diff', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  describe('get', () => {
+    it('should fetch and parse diff', async () => {
+      const mockDiff = {
+        files: [
+          {
+            path: 'src/main.rs',
+            change_type: 'modified',
+            additions: 10,
+            deletions: 3,
+            content: '@@ -1,3 +1,10 @@\n fn main() {}',
+          },
+        ],
+        total_additions: 10,
+        total_deletions: 3,
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockDiff),
+      });
+
+      const result = await api.diff.get('550e8400-e29b-41d4-a716-446655440000');
+      expect(result.files).toHaveLength(1);
+      expect(result.total_additions).toBe(10);
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/tasks/550e8400-e29b-41d4-a716-446655440000/diff'
+      );
+    });
+
+    it('should throw ApiError on failure', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: () => Promise.resolve({ error: 'Task not found' }),
+      });
+
+      await expect(
+        api.diff.get('nonexistent')
+      ).rejects.toThrow(ApiError);
+    });
+  });
+});
+
+describe('api.preview', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  describe('start', () => {
+    it('should start preview and return info', async () => {
+      const mockInfo = {
+        task_id: '550e8400-e29b-41d4-a716-446655440000',
+        backend_url: 'http://localhost:9900',
+        frontend_url: 'http://localhost:5200',
+        backend_port: 9900,
+        frontend_port: 5200,
+        status: 'running',
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockInfo),
+      });
+
+      const result = await api.preview.start('550e8400-e29b-41d4-a716-446655440000');
+      expect(result.backend_port).toBe(9900);
+      expect(result.frontend_port).toBe(5200);
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/tasks/550e8400-e29b-41d4-a716-446655440000/preview',
+        expect.objectContaining({
+          method: 'POST',
+        })
+      );
+    });
+
+    it('should throw ApiError when task has no worktree', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: () => Promise.resolve({ error: 'Task has no worktree' }),
+      });
+
+      await expect(
+        api.preview.start('550e8400-e29b-41d4-a716-446655440000')
+      ).rejects.toThrow(ApiError);
+    });
+  });
+
+  describe('stop', () => {
+    it('should stop preview', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      });
+
+      await api.preview.stop('550e8400-e29b-41d4-a716-446655440000');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/tasks/550e8400-e29b-41d4-a716-446655440000/preview',
+        expect.objectContaining({
+          method: 'DELETE',
+        })
+      );
+    });
+
+    it('should throw ApiError when no preview running', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: () => Promise.resolve({ error: 'No preview running for this task' }),
+      });
+
+      await expect(
+        api.preview.stop('550e8400-e29b-41d4-a716-446655440000')
+      ).rejects.toThrow(ApiError);
+    });
+  });
+
+  describe('status', () => {
+    it('should get preview status', async () => {
+      const mockInfo = {
+        task_id: '550e8400-e29b-41d4-a716-446655440000',
+        backend_url: 'http://localhost:9900',
+        frontend_url: 'http://localhost:5200',
+        backend_port: 9900,
+        frontend_port: 5200,
+        status: 'running',
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockInfo),
+      });
+
+      const result = await api.preview.status('550e8400-e29b-41d4-a716-446655440000');
+      expect(result.status).toBe('running');
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/tasks/550e8400-e29b-41d4-a716-446655440000/preview'
+      );
+    });
+
+    it('should throw ApiError when no preview running', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: () => Promise.resolve({ error: 'No preview running for this task' }),
+      });
+
+      await expect(
+        api.preview.status('nonexistent')
+      ).rejects.toThrow(ApiError);
+    });
+  });
+});

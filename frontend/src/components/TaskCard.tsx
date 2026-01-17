@@ -1,6 +1,7 @@
 import { Draggable } from '@hello-pangea/dnd';
 import clsx from 'clsx';
 import { Task } from '../types/task';
+import { Spinner } from './ui';
 
 interface TaskCardProps {
   task: Task;
@@ -9,9 +10,10 @@ interface TaskCardProps {
   onDelete: (id: string) => void;
   onStart: (id: string) => void;
   onCancel: (id: string) => void;
+  onReview: (task: Task) => void;
 }
 
-export function TaskCard({ task, index, onSelect, onDelete, onStart, onCancel }: TaskCardProps) {
+export function TaskCard({ task, index, onSelect, onDelete, onStart, onCancel, onReview }: TaskCardProps) {
   const isRunning = task.status === 'in_progress';
   const hasError = !!task.error_message;
 
@@ -41,7 +43,7 @@ export function TaskCard({ task, index, onSelect, onDelete, onStart, onCancel }:
               {task.title}
             </h3>
             {isRunning && (
-              <span className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full flex-shrink-0" />
+              <Spinner size="sm" className="flex-shrink-0" />
             )}
           </div>
 
@@ -88,6 +90,18 @@ export function TaskCard({ task, index, onSelect, onDelete, onStart, onCancel }:
                 className="px-2 py-1 text-xs bg-orange-600 hover:bg-orange-700 rounded text-white"
               >
                 Cancel
+              </button>
+            )}
+
+            {task.status === 'review' && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReview(task);
+                }}
+                className="px-2 py-1 text-xs bg-purple-600 hover:bg-purple-700 rounded text-white"
+              >
+                Review
               </button>
             )}
 

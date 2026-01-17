@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react';
 import { KanbanBoard } from './components/KanbanBoard';
 import { CreateTaskModal } from './components/CreateTaskModal';
 import { LogPanel } from './components/LogPanel';
+import { ReviewPanel } from './components/ReviewPanel';
+import { Spinner } from './components/ui';
 import {
   useTasks,
   useCreateTask,
@@ -16,6 +18,7 @@ import { Task, TaskStatus } from './types/task';
 function App() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [reviewTask, setReviewTask] = useState<Task | null>(null);
   const [taskLogs, setTaskLogs] = useState<Record<string, LogEntry[]>>({});
 
   const { data: tasks = [], isLoading, error } = useTasks();
@@ -32,8 +35,8 @@ function App() {
     }));
   }, []);
 
-  const handleExecutionComplete = useCallback((taskId: string, success: boolean) => {
-    console.log(`Task ${taskId} completed with success: ${success}`);
+  const handleExecutionComplete = useCallback((_taskId: string, _success: boolean) => {
+    // Task completion is reflected via WebSocket task updates
   }, []);
 
   const { isConnected } = useWebSocket({
@@ -88,6 +91,14 @@ function App() {
     setSelectedTask(null);
   };
 
+  const handleReviewTask = (task: Task) => {
+    setReviewTask(task);
+  };
+
+  const handleCloseReviewPanel = () => {
+    setReviewTask(null);
+  };
+
   if (error) {
     return (
       <div className="min-h-screen bg-[#0f172a] flex items-center justify-center">
@@ -127,7 +138,7 @@ function App() {
       <main className="flex-1 p-6 overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
-            <div className="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full" />
+            <Spinner size="lg" />
           </div>
         ) : (
           <KanbanBoard
@@ -137,6 +148,7 @@ function App() {
             onDeleteTask={handleDeleteTask}
             onStartTask={handleStartTask}
             onCancelTask={handleCancelTask}
+            onReviewTask={handleReviewTask}
           />
         )}
       </main>
@@ -154,6 +166,13 @@ function App() {
         onSubmit={handleCreateTask}
         isLoading={createTask.isPending}
       />
+
+      {reviewTask && (
+        <ReviewPanel
+          task={reviewTask}
+          onClose={handleCloseReviewPanel}
+        />
+      )}
     </div>
   );
 }

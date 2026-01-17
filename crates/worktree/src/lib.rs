@@ -2,6 +2,9 @@ use std::path::{Path, PathBuf};
 use git2::{Repository, BranchType};
 use thiserror::Error;
 
+pub mod diff;
+pub use diff::{DiffFile, DiffChangeType, DiffResponse, get_worktree_diff};
+
 #[derive(Debug, Error)]
 pub enum WorktreeError {
     #[error("Git error: {0}")]

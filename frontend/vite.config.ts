@@ -18,5 +18,6 @@ export default defineConfig({
   },
   test: {
     exclude: ['e2e/**', 'node_modules/**'],
+    environment: 'jsdom',
   },
 })

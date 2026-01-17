@@ -9,6 +9,7 @@ interface KanbanBoardProps {
   onDeleteTask: (id: string) => void;
   onStartTask: (id: string) => void;
   onCancelTask: (id: string) => void;
+  onReviewTask: (task: Task) => void;
 }
 
 export function KanbanBoard({
@@ -18,6 +19,7 @@ export function KanbanBoard({
   onDeleteTask,
   onStartTask,
   onCancelTask,
+  onReviewTask,
 }: KanbanBoardProps) {
   const tasksByStatus = COLUMN_ORDER.reduce(
     (acc, status) => {
@@ -61,6 +63,7 @@ export function KanbanBoard({
             onDeleteTask={onDeleteTask}
             onStartTask={onStartTask}
             onCancelTask={onCancelTask}
+            onReviewTask={onReviewTask}
           />
         ))}
       </div>

@@ -10,6 +10,7 @@ interface KanbanColumnProps {
   onDeleteTask: (id: string) => void;
   onStartTask: (id: string) => void;
   onCancelTask: (id: string) => void;
+  onReviewTask: (task: Task) => void;
 }
 
 export function KanbanColumn({
@@ -19,6 +20,7 @@ export function KanbanColumn({
   onDeleteTask,
   onStartTask,
   onCancelTask,
+  onReviewTask,
 }: KanbanColumnProps) {
   const title = COLUMN_TITLES[status];
 
@@ -57,6 +59,7 @@ export function KanbanColumn({
                 onDelete={onDeleteTask}
                 onStart={onStartTask}
                 onCancel={onCancelTask}
+                onReview={onReviewTask}
               />
             ))}
             {provided.placeholder}
