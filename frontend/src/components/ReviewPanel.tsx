@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import { Task } from '../types/task';
 import { useDiff } from '../hooks/useDiff';
 import { usePreview } from '../hooks/usePreview';
+import { useMergeTask } from '../hooks/useTasks';
 import { DiffViewer } from './DiffViewer';
 import { PreviewControls } from './PreviewControls';
 import { EmptyState } from './ui';
@@ -10,30 +11,50 @@ import { EmptyState } from './ui';
 interface ReviewPanelProps {
   task: Task;
   onClose: () => void;
+  onMerge?: (id: string) => void;
 }
 
 type TabType = 'diff' | 'preview';
 
-export function ReviewPanel({ task, onClose }: ReviewPanelProps) {
+export function ReviewPanel({ task, onClose, onMerge }: ReviewPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>('diff');
+  const [mergeError, setMergeError] = useState<string | null>(null);
   const { data: diff, isLoading: diffLoading, error: diffError } = useDiff(task.id);
   const preview = usePreview(task.id);
+  const mergeTask = useMergeTask();
+
+  const handleApproveAndMerge = async () => {
+    setMergeError(null);
+    try {
+      // Use onMerge callback if provided (for WebSocket events), otherwise use hook directly
+      if (onMerge) {
+        onMerge(task.id);
+        onClose();
+      } else {
+        await mergeTask.mutateAsync(task.id);
+        onClose();
+      }
+    } catch (error) {
+      setMergeError(error instanceof Error ? error.message : 'Failed to merge task');
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
       <div className="bg-[#1e293b] rounded-lg w-[90vw] h-[85vh] flex flex-col shadow-2xl">
         {/* Header */}
-        <header className="flex items-center justify-between p-4 border-b border-gray-700">
-          <div className="flex items-center gap-4">
-            <h2 className="text-white font-semibold text-lg">
-              Review: {task.title}
-            </h2>
-            {task.branch_name && (
-              <span className="text-gray-400 text-sm font-mono bg-gray-800 px-2 py-1 rounded">
-                {task.branch_name}
-              </span>
-            )}
-          </div>
+        <header className="flex flex-col border-b border-gray-700">
+          <div className="flex items-center justify-between p-4">
+            <div className="flex items-center gap-4">
+              <h2 className="text-white font-semibold text-lg">
+                Review: {task.title}
+              </h2>
+              {task.branch_name && (
+                <span className="text-gray-400 text-sm font-mono bg-gray-800 px-2 py-1 rounded">
+                  {task.branch_name}
+                </span>
+              )}
+            </div>
 
           <div className="flex items-center gap-3">
             {/* Tab buttons */}
@@ -70,6 +91,31 @@ export function ReviewPanel({ task, onClose }: ReviewPanelProps) {
               </button>
             </div>
 
+            {/* Approve & Merge button */}
+            <button
+              onClick={handleApproveAndMerge}
+              disabled={mergeTask.isPending}
+              data-testid="approve-merge-button"
+              className={clsx(
+                'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                mergeTask.isPending
+                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                  : 'bg-green-600 hover:bg-green-700 text-white'
+              )}
+            >
+              {mergeTask.isPending ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Merging...
+                </span>
+              ) : (
+                'Approve & Merge'
+              )}
+            </button>
+
             {/* Close button */}
             <button
               onClick={onClose}
@@ -80,6 +126,14 @@ export function ReviewPanel({ task, onClose }: ReviewPanelProps) {
               </svg>
             </button>
           </div>
+          </div>
+
+          {/* Error message */}
+          {mergeError && (
+            <div className="px-4 py-2 bg-red-900/50 text-red-300 text-sm">
+              {mergeError}
+            </div>
+          )}
         </header>
 
         {/* Content */}
@@ -110,8 +164,12 @@ export function ReviewPanel({ task, onClose }: ReviewPanelProps) {
               error={preview.error}
               isStarting={preview.isStarting}
               isStopping={preview.isStopping}
+              isRestartingBackend={preview.isRestartingBackend}
+              isRestartingFrontend={preview.isRestartingFrontend}
               onStart={preview.start}
               onStop={preview.stop}
+              onRestartBackend={preview.restartBackend}
+              onRestartFrontend={preview.restartFrontend}
             />
           )}
         </main>

@@ -11,6 +11,7 @@ vi.mock('../lib/api', () => ({
       start: vi.fn(),
       stop: vi.fn(),
       status: vi.fn(),
+      restart: vi.fn(),
     },
   },
 }));
@@ -18,6 +19,7 @@ vi.mock('../lib/api', () => ({
 const mockPreviewStart = api.preview.start as Mock;
 const mockPreviewStop = api.preview.stop as Mock;
 const mockPreviewStatus = api.preview.status as Mock;
+const mockPreviewRestart = api.preview.restart as Mock;
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -53,6 +55,8 @@ describe('usePreview', () => {
     expect(result.current.error).toBeNull();
     expect(result.current.isStarting).toBe(false);
     expect(result.current.isStopping).toBe(false);
+    expect(result.current.isRestartingBackend).toBe(false);
+    expect(result.current.isRestartingFrontend).toBe(false);
   });
 
   it('should check initial status on mount', async () => {
@@ -153,5 +157,71 @@ describe('usePreview', () => {
     });
 
     expect(mockPreviewStop).not.toHaveBeenCalled();
+  });
+
+  it('should restart backend server', async () => {
+    vi.useRealTimers();
+    const mockInfo = {
+      task_id: '550e8400-e29b-41d4-a716-446655440000',
+      backend_url: 'http://localhost:9901',
+      frontend_url: 'http://localhost:5200',
+      backend_port: 9901,
+      frontend_port: 5200,
+      status: 'running' as const,
+    };
+
+    mockPreviewStatus.mockRejectedValueOnce(new Error('Not found'));
+    mockPreviewRestart.mockResolvedValueOnce(mockInfo);
+
+    const { result } = renderHook(
+      () => usePreview('550e8400-e29b-41d4-a716-446655440000'),
+      { wrapper: createWrapper() }
+    );
+
+    await act(async () => {
+      result.current.restartBackend();
+    });
+
+    await waitFor(() => expect(result.current.status).toEqual(mockInfo));
+    expect(mockPreviewRestart).toHaveBeenCalledWith('550e8400-e29b-41d4-a716-446655440000', 'backend');
+  });
+
+  it('should restart frontend server', async () => {
+    vi.useRealTimers();
+    const mockInfo = {
+      task_id: '550e8400-e29b-41d4-a716-446655440000',
+      backend_url: 'http://localhost:9900',
+      frontend_url: 'http://localhost:5201',
+      backend_port: 9900,
+      frontend_port: 5201,
+      status: 'running' as const,
+    };
+
+    mockPreviewStatus.mockRejectedValueOnce(new Error('Not found'));
+    mockPreviewRestart.mockResolvedValueOnce(mockInfo);
+
+    const { result } = renderHook(
+      () => usePreview('550e8400-e29b-41d4-a716-446655440000'),
+      { wrapper: createWrapper() }
+    );
+
+    await act(async () => {
+      result.current.restartFrontend();
+    });
+
+    await waitFor(() => expect(result.current.status).toEqual(mockInfo));
+    expect(mockPreviewRestart).toHaveBeenCalledWith('550e8400-e29b-41d4-a716-446655440000', 'frontend');
+  });
+
+  it('should not restart when taskId is null', async () => {
+    vi.useRealTimers();
+    const { result } = renderHook(() => usePreview(null), { wrapper: createWrapper() });
+
+    await act(async () => {
+      result.current.restartBackend();
+      result.current.restartFrontend();
+    });
+
+    expect(mockPreviewRestart).not.toHaveBeenCalled();
   });
 });

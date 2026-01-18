@@ -11,6 +11,9 @@ interface KanbanColumnProps {
   onStartTask: (id: string) => void;
   onCancelTask: (id: string) => void;
   onReviewTask: (task: Task) => void;
+  onMergeTask: (id: string) => void;
+  mergingTaskId?: string;
+  mergeStatus?: string;
 }
 
 export function KanbanColumn({
@@ -21,6 +24,9 @@ export function KanbanColumn({
   onStartTask,
   onCancelTask,
   onReviewTask,
+  onMergeTask,
+  mergingTaskId,
+  mergeStatus,
 }: KanbanColumnProps) {
   const title = COLUMN_TITLES[status];
 
@@ -60,6 +66,9 @@ export function KanbanColumn({
                 onStart={onStartTask}
                 onCancel={onCancelTask}
                 onReview={onReviewTask}
+                onMerge={onMergeTask}
+                isMerging={mergingTaskId === task.id}
+                mergeStatus={mergingTaskId === task.id ? mergeStatus : undefined}
               />
             ))}
             {provided.placeholder}

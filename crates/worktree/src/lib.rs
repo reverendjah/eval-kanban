@@ -17,6 +17,10 @@ pub enum WorktreeError {
     BranchExists(String),
     #[error("Worktree already exists: {0}")]
     WorktreeExists(String),
+    #[error("Branch not found: {0}")]
+    BranchNotFound(String),
+    #[error("Merge conflict: {0}")]
+    MergeConflict(String),
 }
 
 /// Create a slug from a title for branch naming
@@ -44,9 +48,10 @@ pub fn slugify(title: &str) -> String {
         .collect()
 }
 
-/// Generate a branch name from task title
-pub fn generate_branch_name(title: &str) -> String {
-    format!("ek/{}", slugify(title))
+/// Generate a unique branch name from task title and task ID
+pub fn generate_branch_name(title: &str, task_id: &str) -> String {
+    let short_id = &task_id[..8.min(task_id.len())];
+    format!("ek/{}-{}", slugify(title), short_id)
 }
 
 /// Manager for git worktrees
@@ -89,9 +94,11 @@ impl WorktreeManager {
     pub async fn create_worktree(
         &self,
         task_title: &str,
+        task_id: &str,
     ) -> Result<(String, PathBuf), WorktreeError> {
-        let branch_name = generate_branch_name(task_title);
-        let slug = slugify(task_title);
+        let branch_name = generate_branch_name(task_title, task_id);
+        let short_id = &task_id[..8.min(task_id.len())];
+        let slug = format!("{}-{}", slugify(task_title), short_id);
         let worktree_path = self.get_worktree_path(&slug);
 
         let repo_path = self.repo_path.clone();
@@ -161,6 +168,53 @@ impl WorktreeManager {
         }
 
         Ok(removed)
+    }
+
+    /// Merge a branch into main and return to main branch
+    pub async fn merge_branch(&self, branch_name: &str) -> Result<(), WorktreeError> {
+        let repo_path = self.repo_path.clone();
+        let branch_name = branch_name.to_string();
+
+        tokio::task::spawn_blocking(move || {
+            merge_branch_sync(&repo_path, &branch_name)
+        })
+        .await
+        .map_err(|e| WorktreeError::Io(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            e.to_string(),
+        )))?
+    }
+
+    /// Delete a branch after merge
+    pub async fn delete_branch(&self, branch_name: &str) -> Result<(), WorktreeError> {
+        let repo_path = self.repo_path.clone();
+        let branch_name = branch_name.to_string();
+
+        tokio::task::spawn_blocking(move || {
+            delete_branch_sync(&repo_path, &branch_name)
+        })
+        .await
+        .map_err(|e| WorktreeError::Io(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            e.to_string(),
+        )))?
+    }
+
+    /// Get the HEAD commit hash of the main repo
+    pub async fn get_head_commit(&self) -> Result<String, WorktreeError> {
+        let repo_path = self.repo_path.clone();
+
+        tokio::task::spawn_blocking(move || {
+            let repo = Repository::open(&repo_path)?;
+            let head = repo.head()?;
+            let commit = head.peel_to_commit()?;
+            Ok(commit.id().to_string())
+        })
+        .await
+        .map_err(|e| WorktreeError::Io(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            e.to_string(),
+        )))?
     }
 }
 
@@ -249,6 +303,69 @@ fn remove_worktree_sync(repo_path: &Path, worktree_path: &Path) -> Result<(), Wo
         .output();
 
     tracing::info!("Removed worktree at {}", worktree_path.display());
+
+    Ok(())
+}
+
+fn merge_branch_sync(repo_path: &Path, branch_name: &str) -> Result<(), WorktreeError> {
+    // First, checkout main
+    let output = std::process::Command::new("git")
+        .args(["checkout", "main"])
+        .current_dir(repo_path)
+        .output()?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(WorktreeError::Git(git2::Error::from_str(&format!(
+            "Failed to checkout main: {}",
+            stderr
+        ))));
+    }
+
+    // Merge the branch
+    let output = std::process::Command::new("git")
+        .args(["merge", branch_name, "--no-edit"])
+        .current_dir(repo_path)
+        .output()?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        // Check if it's a merge conflict
+        if stderr.contains("CONFLICT") || stderr.contains("conflict") {
+            // Abort the merge
+            let _ = std::process::Command::new("git")
+                .args(["merge", "--abort"])
+                .current_dir(repo_path)
+                .output();
+            return Err(WorktreeError::MergeConflict(stderr.to_string()));
+        }
+        return Err(WorktreeError::Git(git2::Error::from_str(&format!(
+            "Failed to merge branch: {}",
+            stderr
+        ))));
+    }
+
+    tracing::info!("Merged branch {} into main", branch_name);
+
+    Ok(())
+}
+
+fn delete_branch_sync(repo_path: &Path, branch_name: &str) -> Result<(), WorktreeError> {
+    // Delete the branch (use -D to force delete even if not fully merged)
+    let output = std::process::Command::new("git")
+        .args(["branch", "-d", branch_name])
+        .current_dir(repo_path)
+        .output()?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        // If branch not found, it's ok
+        if !stderr.contains("not found") {
+            tracing::warn!("Failed to delete branch {}: {}", branch_name, stderr);
+        }
+    } else {
+        tracing::info!("Deleted branch {}", branch_name);
+    }
 
     Ok(())
 }

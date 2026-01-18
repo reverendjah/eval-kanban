@@ -11,6 +11,37 @@ import {
   PreviewInfo,
   PreviewInfoSchema,
 } from '../types/review';
+import {
+  StartPlanRequest,
+  StartPlanResponse,
+  AnswerRequest,
+  ExecutePlanRequest,
+  ExecutePlanResponse,
+  PlanSessionInfo,
+  PlanSessionInfoSchema,
+} from '../types/plan';
+import { z } from 'zod';
+
+const StartPlanResponseSchema = z.object({
+  session_id: z.string(),
+});
+
+const MergeResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+  merge_commit: z.string().nullable().optional(),
+}).passthrough(); // passthrough allows the flattened task fields
+
+export interface MergeResponse {
+  success: boolean;
+  message: string;
+  merge_commit?: string | null;
+}
+
+const ExecutePlanResponseSchema = z.object({
+  task_id: z.string(),
+  message: z.string(),
+});
 
 const API_BASE = '/api';
 
@@ -88,6 +119,20 @@ export const api = {
       });
       return handleResponse(response, TaskSchema);
     },
+
+    complete: async (id: string): Promise<Task> => {
+      const response = await fetch(`${API_BASE}/tasks/${id}/complete`, {
+        method: 'POST',
+      });
+      return handleResponse(response, TaskSchema);
+    },
+
+    merge: async (id: string): Promise<MergeResponse> => {
+      const response = await fetch(`${API_BASE}/tasks/${id}/merge`, {
+        method: 'POST',
+      });
+      return handleResponse(response, MergeResponseSchema);
+    },
   },
 
   diff: {
@@ -115,6 +160,77 @@ export const api = {
     status: async (taskId: string): Promise<PreviewInfo> => {
       const response = await fetch(`${API_BASE}/tasks/${taskId}/preview`);
       return handleResponse(response, PreviewInfoSchema);
+    },
+
+    restart: async (taskId: string, server: 'backend' | 'frontend'): Promise<PreviewInfo> => {
+      const response = await fetch(`${API_BASE}/tasks/${taskId}/preview/restart/${server}`, {
+        method: 'POST',
+      });
+      return handleResponse(response, PreviewInfoSchema);
+    },
+  },
+
+  plan: {
+    start: async (request: StartPlanRequest): Promise<StartPlanResponse> => {
+      const response = await fetch(`${API_BASE}/plan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      });
+      return handleResponse(response, StartPlanResponseSchema);
+    },
+
+    get: async (sessionId: string): Promise<PlanSessionInfo> => {
+      const response = await fetch(`${API_BASE}/plan/${sessionId}`);
+      return handleResponse(response, PlanSessionInfoSchema);
+    },
+
+    answer: async (sessionId: string, request: AnswerRequest): Promise<void> => {
+      const response = await fetch(`${API_BASE}/plan/${sessionId}/answer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      });
+      await handleVoidResponse(response);
+    },
+
+    execute: async (sessionId: string, request: ExecutePlanRequest): Promise<ExecutePlanResponse> => {
+      const response = await fetch(`${API_BASE}/plan/${sessionId}/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      });
+      return handleResponse(response, ExecutePlanResponseSchema);
+    },
+
+    cancel: async (sessionId: string): Promise<void> => {
+      const response = await fetch(`${API_BASE}/plan/${sessionId}`, {
+        method: 'DELETE',
+      });
+      await handleVoidResponse(response);
+    },
+
+    redo: async (sessionId: string): Promise<StartPlanResponse> => {
+      const response = await fetch(`${API_BASE}/plan/${sessionId}/redo`, {
+        method: 'POST',
+      });
+      return handleResponse(response, StartPlanResponseSchema);
+    },
+
+    resume: async (sessionId: string): Promise<StartPlanResponse> => {
+      const response = await fetch(`${API_BASE}/plan/${sessionId}/resume`, {
+        method: 'POST',
+      });
+      return handleResponse(response, StartPlanResponseSchema);
+    },
+  },
+
+  server: {
+    restart: async (): Promise<void> => {
+      const response = await fetch(`${API_BASE}/server/restart`, {
+        method: 'POST',
+      });
+      await handleVoidResponse(response);
     },
   },
 };

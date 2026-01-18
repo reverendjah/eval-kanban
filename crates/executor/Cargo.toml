@@ -3,6 +3,10 @@ name = "eval-kanban-executor"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "test_spawn"
+path = "src/bin/test_spawn.rs"
+
 [dependencies]
 tokio = { workspace = true }
 serde = { workspace = true }

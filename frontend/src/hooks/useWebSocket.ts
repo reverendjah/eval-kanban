@@ -3,6 +3,22 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Task, TaskSchema } from '../types/task';
 import { z } from 'zod';
 
+const PlanQuestionOptionSchema = z.object({
+  label: z.string(),
+  description: z.string(),
+});
+
+const PlanQuestionSchema = z.object({
+  index: z.number(),
+  question: z.string(),
+  header: z.string(),
+  options: z.array(PlanQuestionOptionSchema),
+  multi_select: z.boolean(),
+  tool_use_id: z.string(),
+});
+
+export type PlanQuestion = z.infer<typeof PlanQuestionSchema>;
+
 const WsMessageSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('task_updated'),
@@ -24,6 +40,60 @@ const WsMessageSchema = z.discriminatedUnion('type', [
     success: z.boolean(),
   }),
   z.object({
+    type: z.literal('merge_started'),
+    task_id: z.string(),
+  }),
+  z.object({
+    type: z.literal('merge_progress'),
+    task_id: z.string(),
+    status: z.string(),
+  }),
+  z.object({
+    type: z.literal('merge_complete'),
+    task_id: z.string(),
+    commit: z.string(),
+    message: z.string(),
+  }),
+  z.object({
+    type: z.literal('merge_failed'),
+    task_id: z.string(),
+    error: z.string(),
+  }),
+  z.object({
+    type: z.literal('plan_questions'),
+    session_id: z.string(),
+    questions: z.array(PlanQuestionSchema),
+  }),
+  z.object({
+    type: z.literal('plan_summary'),
+    session_id: z.string(),
+    summary: z.string(),
+  }),
+  z.object({
+    type: z.literal('plan_error'),
+    session_id: z.string(),
+    error: z.string(),
+  }),
+  z.object({
+    type: z.literal('plan_output'),
+    session_id: z.string(),
+    content: z.string(),
+  }),
+  z.object({
+    type: z.literal('rebuild_started'),
+  }),
+  z.object({
+    type: z.literal('rebuild_progress'),
+    message: z.string(),
+  }),
+  z.object({
+    type: z.literal('rebuild_complete'),
+  }),
+  z.object({
+    type: z.literal('rebuild_failed'),
+    error: z.string(),
+  }),
+  z.object({
     type: z.literal('ping'),
   }),
   z.object({
@@ -39,9 +109,63 @@ export interface LogEntry {
   timestamp: number;
 }
 
+export interface PlanEventHandlers {
+  onPlanQuestions?: (sessionId: string, questions: PlanQuestion[]) => void;
+  onPlanSummary?: (sessionId: string, summary: string) => void;
+  onPlanError?: (sessionId: string, error: string) => void;
+  onPlanOutput?: (sessionId: string, content: string) => void;
+}
+
+export interface MergeEventHandlers {
+  onMergeStarted?: (taskId: string) => void;
+  onMergeProgress?: (taskId: string, status: string) => void;
+  onMergeComplete?: (taskId: string, commit: string, message: string) => void;
+  onMergeFailed?: (taskId: string, error: string) => void;
+}
+
+export interface RebuildEventHandlers {
+  onRebuildStarted?: () => void;
+  onRebuildProgress?: (message: string) => void;
+  onRebuildComplete?: () => void;
+  onRebuildFailed?: (error: string) => void;
+}
+
 interface UseWebSocketOptions {
   onLog?: (taskId: string, entry: LogEntry) => void;
   onExecutionComplete?: (taskId: string, success: boolean) => void;
+}
+
+// Global plan event listeners (can be set by usePlanMode)
+let planEventHandlers: PlanEventHandlers = {};
+
+export function setPlanEventHandlers(handlers: PlanEventHandlers) {
+  planEventHandlers = handlers;
+}
+
+export function clearPlanEventHandlers() {
+  planEventHandlers = {};
+}
+
+// Global merge event listeners
+let mergeEventHandlers: MergeEventHandlers = {};
+
+export function setMergeEventHandlers(handlers: MergeEventHandlers) {
+  mergeEventHandlers = handlers;
+}
+
+export function clearMergeEventHandlers() {
+  mergeEventHandlers = {};
+}
+
+// Global rebuild event listeners
+let rebuildEventHandlers: RebuildEventHandlers = {};
+
+export function setRebuildEventHandlers(handlers: RebuildEventHandlers) {
+  rebuildEventHandlers = handlers;
+}
+
+export function clearRebuildEventHandlers() {
+  rebuildEventHandlers = {};
 }
 
 export function useWebSocket(options: UseWebSocketOptions = {}) {
@@ -79,11 +203,17 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+
+        // Debug: log plan-related messages
+        if (data.type?.startsWith('plan_')) {
+          console.log('[WS] Plan message received:', data.type, data);
+        }
+
         const message = WsMessageSchema.parse(data);
 
         handleMessage(message);
       } catch (error) {
-        console.error('Failed to parse WebSocket message:', error);
+        console.error('Failed to parse WebSocket message:', error, event.data);
       }
     };
 
@@ -100,6 +230,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
             if (exists) {
               return old.map((t) => (t.id === message.task.id ? message.task : t));
             }
+            // Nova task - adicionar ao início da lista
             return [message.task, ...old];
           });
           queryClient.setQueryData(['tasks', message.task.id], message.task);
@@ -122,6 +253,54 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
         case 'execution_complete':
           options.onExecutionComplete?.(message.task_id, message.success);
+          break;
+
+        case 'plan_questions':
+          planEventHandlers.onPlanQuestions?.(message.session_id, message.questions);
+          break;
+
+        case 'plan_summary':
+          planEventHandlers.onPlanSummary?.(message.session_id, message.summary);
+          break;
+
+        case 'plan_error':
+          planEventHandlers.onPlanError?.(message.session_id, message.error);
+          break;
+
+        case 'plan_output':
+          planEventHandlers.onPlanOutput?.(message.session_id, message.content);
+          break;
+
+        case 'merge_started':
+          mergeEventHandlers.onMergeStarted?.(message.task_id);
+          break;
+
+        case 'merge_progress':
+          mergeEventHandlers.onMergeProgress?.(message.task_id, message.status);
+          break;
+
+        case 'merge_complete':
+          mergeEventHandlers.onMergeComplete?.(message.task_id, message.commit, message.message);
+          break;
+
+        case 'merge_failed':
+          mergeEventHandlers.onMergeFailed?.(message.task_id, message.error);
+          break;
+
+        case 'rebuild_started':
+          rebuildEventHandlers.onRebuildStarted?.();
+          break;
+
+        case 'rebuild_progress':
+          rebuildEventHandlers.onRebuildProgress?.(message.message);
+          break;
+
+        case 'rebuild_complete':
+          rebuildEventHandlers.onRebuildComplete?.();
+          break;
+
+        case 'rebuild_failed':
+          rebuildEventHandlers.onRebuildFailed?.(message.error);
           break;
 
         case 'ping':

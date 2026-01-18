@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Draggable } from '@hello-pangea/dnd';
 import clsx from 'clsx';
 import { Task } from '../types/task';
@@ -11,9 +12,24 @@ interface TaskCardProps {
   onStart: (id: string) => void;
   onCancel: (id: string) => void;
   onReview: (task: Task) => void;
+  onMerge: (id: string) => void;
+  isMerging?: boolean;
+  mergeStatus?: string;
 }
 
-export function TaskCard({ task, index, onSelect, onDelete, onStart, onCancel, onReview }: TaskCardProps) {
+export function TaskCard({
+  task,
+  index,
+  onSelect,
+  onDelete,
+  onStart,
+  onCancel,
+  onReview,
+  onMerge,
+  isMerging = false,
+  mergeStatus,
+}: TaskCardProps) {
+  const [showMergePopover, setShowMergePopover] = useState(false);
   const isRunning = task.status === 'in_progress';
   const hasError = !!task.error_message;
 
@@ -93,7 +109,7 @@ export function TaskCard({ task, index, onSelect, onDelete, onStart, onCancel, o
               </button>
             )}
 
-            {task.status === 'review' && (
+            {task.status === 'review' && !isMerging && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -105,15 +121,63 @@ export function TaskCard({ task, index, onSelect, onDelete, onStart, onCancel, o
               </button>
             )}
 
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(task.id);
-              }}
-              className="px-2 py-1 text-xs bg-red-600/20 hover:bg-red-600/40 rounded text-red-400"
-            >
-              Delete
-            </button>
+            {task.status === 'review' && !isMerging && (
+              <div className="relative">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowMergePopover(!showMergePopover);
+                  }}
+                  className="px-2 py-1 text-xs bg-green-600 hover:bg-green-700 rounded text-white"
+                >
+                  Merge
+                </button>
+                {showMergePopover && (
+                  <div
+                    className="absolute bottom-full mb-1 right-0 bg-gray-800 rounded-lg p-3 shadow-lg z-50 min-w-[140px]"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <p className="text-xs text-gray-300 mb-2">Merge to main?</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setShowMergePopover(false)}
+                        className="px-2 py-1 text-xs bg-gray-600 hover:bg-gray-700 rounded text-white"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowMergePopover(false);
+                          onMerge(task.id);
+                        }}
+                        className="px-2 py-1 text-xs bg-green-600 hover:bg-green-700 rounded text-white"
+                      >
+                        Merge
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {isMerging && (
+              <div className="flex items-center gap-2 text-xs text-green-400">
+                <Spinner size="sm" />
+                <span>{mergeStatus || 'Merging...'}</span>
+              </div>
+            )}
+
+            {!isMerging && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(task.id);
+                }}
+                className="px-2 py-1 text-xs bg-red-600/20 hover:bg-red-600/40 rounded text-red-400"
+              >
+                Delete
+              </button>
+            )}
           </div>
         </div>
       )}

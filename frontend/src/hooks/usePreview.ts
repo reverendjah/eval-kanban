@@ -31,6 +31,28 @@ export function usePreview(taskId: string | null) {
     },
   });
 
+  const restartBackendMutation = useMutation({
+    mutationFn: () => api.preview.restart(taskId!, 'backend'),
+    onSuccess: (data) => {
+      setStatus(data);
+      setError(null);
+    },
+    onError: (err: Error) => {
+      setError(err.message);
+    },
+  });
+
+  const restartFrontendMutation = useMutation({
+    mutationFn: () => api.preview.restart(taskId!, 'frontend'),
+    onSuccess: (data) => {
+      setStatus(data);
+      setError(null);
+    },
+    onError: (err: Error) => {
+      setError(err.message);
+    },
+  });
+
   // Poll status while running
   useEffect(() => {
     if (!taskId || !status) return;
@@ -69,12 +91,28 @@ export function usePreview(taskId: string | null) {
     }
   }, [taskId, stopMutation]);
 
+  const restartBackend = useCallback(() => {
+    if (taskId) {
+      restartBackendMutation.mutate();
+    }
+  }, [taskId, restartBackendMutation]);
+
+  const restartFrontend = useCallback(() => {
+    if (taskId) {
+      restartFrontendMutation.mutate();
+    }
+  }, [taskId, restartFrontendMutation]);
+
   return {
     status,
     error,
     start,
     stop,
+    restartBackend,
+    restartFrontend,
     isStarting: startMutation.isPending,
     isStopping: stopMutation.isPending,
+    isRestartingBackend: restartBackendMutation.isPending,
+    isRestartingFrontend: restartFrontendMutation.isPending,
   };
 }

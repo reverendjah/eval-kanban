@@ -87,6 +87,32 @@ export function useCancelTask() {
   });
 }
 
+export function useCompleteTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => api.tasks.complete(id),
+    onSuccess: (task) => {
+      queryClient.setQueryData<Task[]>(['tasks'], (old) => {
+        return old?.map((t) => (t.id === task.id ? task : t));
+      });
+      queryClient.setQueryData(['tasks', task.id], task);
+    },
+  });
+}
+
+export function useMergeTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => api.tasks.merge(id),
+    onSuccess: () => {
+      // Query will be updated via WebSocket TaskUpdated event
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+}
+
 export function useMoveTask() {
   const updateTask = useUpdateTask();
   const startTask = useStartTask();

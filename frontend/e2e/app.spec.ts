@@ -45,6 +45,9 @@ test.describe('eval-kanban', () => {
     test('should show validation error for empty title', async ({ page }) => {
       await page.getByRole('button', { name: /New Task/i }).click();
 
+      // Disable Plan Mode to use direct creation
+      await page.getByRole('checkbox', { name: /Plan Mode/i }).uncheck();
+
       await page.getByRole('button', { name: 'Create Task' }).click();
 
       await expect(page.getByText('Title is required')).toBeVisible();
@@ -56,10 +59,14 @@ test.describe('eval-kanban', () => {
       await page.getByRole('button', { name: /New Task/i }).click();
       await page.getByPlaceholder('Task title...').fill(taskTitle);
       await page.getByPlaceholder('Describe the task for Claude...').fill('Test description');
+
+      // Disable Plan Mode to use direct creation
+      await page.getByRole('checkbox', { name: /Plan Mode/i }).uncheck();
+
       await page.getByRole('button', { name: 'Create Task' }).click();
 
       await expect(page.getByRole('heading', { name: 'New Task' })).not.toBeVisible();
-      await expect(page.getByText(taskTitle)).toBeVisible();
+      await expect(page.getByText(taskTitle).first()).toBeVisible();
     });
   });
 
@@ -69,17 +76,27 @@ test.describe('eval-kanban', () => {
 
       await page.getByRole('button', { name: /New Task/i }).click();
       await page.getByPlaceholder('Task title...').fill(taskTitle);
+
+      // Disable Plan Mode to use direct creation
+      await page.getByRole('checkbox', { name: /Plan Mode/i }).uncheck();
+
       await page.getByRole('button', { name: 'Create Task' }).click();
 
-      await expect(page.getByText(taskTitle)).toBeVisible();
+      // Wait for modal to close first
+      await expect(page.getByRole('heading', { name: 'New Task' })).not.toBeVisible();
+      await expect(page.getByText(taskTitle).first()).toBeVisible();
+
+      // Count tasks before delete
+      const countBefore = await page.getByRole('heading', { name: taskTitle }).count();
 
       page.on('dialog', (dialog) => dialog.accept());
 
       // Find the task card by its title h3, go up to the task card div, and click Delete
-      const taskCard = page.locator('h3', { hasText: taskTitle }).locator('..').locator('..');
+      const taskCard = page.locator('h3', { hasText: taskTitle }).first().locator('..').locator('..');
       await taskCard.getByRole('button', { name: 'Delete' }).click();
 
-      await expect(page.getByText(taskTitle)).not.toBeVisible();
+      // Wait for deletion - should have one less task (handles potential duplicates)
+      await expect(page.getByRole('heading', { name: taskTitle })).toHaveCount(countBefore - 1, { timeout: 10000 });
     });
   });
 
@@ -89,13 +106,101 @@ test.describe('eval-kanban', () => {
 
       await page.getByRole('button', { name: /New Task/i }).click();
       await page.getByPlaceholder('Task title...').fill(taskTitle);
+
+      // Disable Plan Mode to use direct creation
+      await page.getByRole('checkbox', { name: /Plan Mode/i }).uncheck();
+
       await page.getByRole('button', { name: 'Create Task' }).click();
 
-      await expect(page.getByText(taskTitle)).toBeVisible();
+      await expect(page.getByText(taskTitle).first()).toBeVisible();
 
       // Find the task card by its title h3 and check for Start button
-      const taskCard = page.locator('h3', { hasText: taskTitle }).locator('..').locator('..');
+      const taskCard = page.locator('h3', { hasText: taskTitle }).first().locator('..').locator('..');
       await expect(taskCard.getByRole('button', { name: 'Start' })).toBeVisible();
+    });
+  });
+
+  test.describe('Plan Mode', () => {
+    test('should show Plan Mode checkbox checked by default', async ({ page }) => {
+      await page.getByRole('button', { name: /New Task/i }).click();
+
+      // Plan Mode checkbox should be visible and checked by default
+      const planModeCheckbox = page.getByRole('checkbox', { name: /Plan Mode/i });
+      await expect(planModeCheckbox).toBeVisible();
+      await expect(planModeCheckbox).toBeChecked();
+
+      // Button should say "Start Planning" not "Create Task"
+      await expect(page.getByRole('button', { name: 'Start Planning' })).toBeVisible();
+    });
+
+    test('should switch button text when toggling Plan Mode', async ({ page }) => {
+      await page.getByRole('button', { name: /New Task/i }).click();
+
+      // Initially should show "Start Planning"
+      await expect(page.getByRole('button', { name: 'Start Planning' })).toBeVisible();
+
+      // Uncheck Plan Mode
+      await page.getByRole('checkbox', { name: /Plan Mode/i }).uncheck();
+
+      // Now should show "Create Task"
+      await expect(page.getByRole('button', { name: 'Create Task' })).toBeVisible();
+
+      // Check Plan Mode again
+      await page.getByRole('checkbox', { name: /Plan Mode/i }).check();
+
+      // Should show "Start Planning" again
+      await expect(page.getByRole('button', { name: 'Start Planning' })).toBeVisible();
+    });
+
+    // Skip: Requires real Claude instance - run manually or in integration environment
+    test.skip('should show loading state when starting Plan Mode', async ({ page }) => {
+      await page.getByRole('button', { name: /New Task/i }).click();
+
+      // Fill in the form
+      await page.getByPlaceholder('Task title...').fill('Plan Mode Test');
+      await page.getByPlaceholder('Describe the task for Claude...').fill('Test description for plan mode');
+
+      // Plan Mode is ON by default, click to start planning
+      await page.getByRole('button', { name: 'Start Planning' }).click();
+
+      // Should show loading state - "Claude is thinking..." text with spinner
+      // Modal should stay open (not close like with Create Task)
+      await expect(page.locator('text=Starting...').or(page.locator('text=Claude is thinking...'))).toBeVisible({ timeout: 10000 });
+    });
+
+    // Skip: Requires real Claude instance - run manually or in integration environment
+    test.skip('should complete Plan Mode Q&A flow', async ({ page }) => {
+      // This test requires a running Claude instance and may take longer
+      test.setTimeout(180000); // 3 minutes timeout
+
+      await page.getByRole('button', { name: /New Task/i }).click();
+
+      // Fill in the form (Plan Mode is ON by default)
+      await page.getByPlaceholder('Task title...').fill('Plan Mode E2E Test');
+      await page.getByPlaceholder('Describe the task for Claude...').fill('Create a simple hello world function in TypeScript');
+
+      // Start planning
+      await page.getByRole('button', { name: 'Start Planning' }).click();
+
+      // Wait for loading state or question to appear
+      await expect(
+        page.locator('text=Claude is thinking...').or(page.getByText(/Question \d+/))
+      ).toBeVisible({ timeout: 30000 });
+
+      // Wait for question to appear (exit "thinking" state)
+      await expect(page.getByText(/Question \d+/)).toBeVisible({ timeout: 120000 });
+
+      // Select first option (radio/checkbox)
+      const firstOption = page.locator('input[name="answer"]').first();
+      await firstOption.check();
+
+      // Submit answer
+      await page.getByRole('button', { name: 'Submit Answer' }).click();
+
+      // Wait for next question or summary (Execute Plan button)
+      await expect(
+        page.getByText(/Question \d+/).or(page.getByRole('button', { name: 'Execute Plan' }))
+      ).toBeVisible({ timeout: 120000 });
     });
   });
 

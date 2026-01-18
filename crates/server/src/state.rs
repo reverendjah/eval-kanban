@@ -8,8 +8,10 @@ use serde::Serialize;
 
 use eval_kanban_worktree::WorktreeManager;
 use crate::routes::ws::WsMessage;
+use crate::plan_session::{PlanSession, PlanSessionInfo};
 
 pub struct RunningTask {
+    #[allow(dead_code)]
     pub task_id: String,
     pub cancel_tx: mpsc::Sender<()>,
 }
@@ -27,6 +29,7 @@ pub struct PreviewInfo {
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[allow(dead_code)]
 pub enum PreviewStatus {
     Starting,
     Running,
@@ -46,8 +49,8 @@ impl PreviewProcess {
     pub fn to_info(&self, status: PreviewStatus) -> PreviewInfo {
         PreviewInfo {
             task_id: self.task_id.clone(),
-            backend_url: format!("http://127.0.0.1:{}", self.backend_port),
-            frontend_url: format!("http://127.0.0.1:{}", self.frontend_port),
+            backend_url: format!("http://localhost:{}", self.backend_port),
+            frontend_url: format!("http://localhost:{}", self.frontend_port),
             backend_port: self.backend_port,
             frontend_port: self.frontend_port,
             status,
@@ -62,6 +65,7 @@ pub struct AppState {
     pub ws_broadcast: broadcast::Sender<WsMessage>,
     pub running_tasks: RwLock<HashMap<String, RunningTask>>,
     pub preview_processes: RwLock<HashMap<String, PreviewProcess>>,
+    pub plan_sessions: RwLock<HashMap<String, PlanSession>>,
 }
 
 impl AppState {
@@ -78,11 +82,20 @@ impl AppState {
             ws_broadcast,
             running_tasks: RwLock::new(HashMap::new()),
             preview_processes: RwLock::new(HashMap::new()),
+            plan_sessions: RwLock::new(HashMap::new()),
         })
     }
 
     pub async fn broadcast(&self, msg: WsMessage) {
-        let _ = self.ws_broadcast.send(msg);
+        match self.ws_broadcast.send(msg) {
+            Ok(receivers) => {
+                tracing::debug!("[Broadcast] Message sent to {} receivers", receivers);
+            }
+            Err(e) => {
+                // Only log if this is unexpected (no receivers is normal on startup)
+                tracing::debug!("[Broadcast] No receivers for message: {:?}", e.0);
+            }
+        }
     }
 
     pub async fn add_running_task(&self, task_id: String, cancel_tx: mpsc::Sender<()>) {
@@ -121,11 +134,56 @@ impl AppState {
         previews.get(task_id).map(|p| p.to_info(PreviewStatus::Running))
     }
 
+    #[allow(dead_code)]
     pub async fn cleanup_all_previews(&self) {
         let mut previews = self.preview_processes.write().await;
         for (task_id, _process) in previews.drain() {
             tracing::info!("Cleaning up preview for task {}", task_id);
             // Processes will be killed on drop due to kill_on_drop(true)
+        }
+    }
+
+    // Plan session management
+    pub async fn add_plan_session(&self, session: PlanSession) {
+        let mut sessions = self.plan_sessions.write().await;
+        sessions.insert(session.id.clone(), session);
+    }
+
+    pub async fn get_plan_session_info(&self, session_id: &str) -> Option<PlanSessionInfo> {
+        let sessions = self.plan_sessions.read().await;
+        sessions.get(session_id).map(|s| s.to_info())
+    }
+
+    pub async fn remove_plan_session(&self, session_id: &str) -> Option<PlanSession> {
+        let mut sessions = self.plan_sessions.write().await;
+        sessions.remove(session_id)
+    }
+
+    pub async fn update_plan_session<F>(&self, session_id: &str, f: F) -> bool
+    where
+        F: FnOnce(&mut PlanSession),
+    {
+        let mut sessions = self.plan_sessions.write().await;
+        if let Some(session) = sessions.get_mut(session_id) {
+            f(session);
+            true
+        } else {
+            false
+        }
+    }
+
+    #[allow(dead_code)]
+    pub async fn cleanup_expired_sessions(&self, timeout_secs: u64) {
+        let mut sessions = self.plan_sessions.write().await;
+        let expired: Vec<String> = sessions
+            .iter()
+            .filter(|(_, s)| s.is_expired(timeout_secs))
+            .map(|(id, _)| id.clone())
+            .collect();
+
+        for id in expired {
+            tracing::info!("Cleaning up expired plan session {}", id);
+            sessions.remove(&id);
         }
     }
 }

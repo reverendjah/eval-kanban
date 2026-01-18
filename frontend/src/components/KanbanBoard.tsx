@@ -10,6 +10,9 @@ interface KanbanBoardProps {
   onStartTask: (id: string) => void;
   onCancelTask: (id: string) => void;
   onReviewTask: (task: Task) => void;
+  onMergeTask: (id: string) => void;
+  mergingTaskId?: string;
+  mergeStatus?: string;
 }
 
 export function KanbanBoard({
@@ -20,6 +23,9 @@ export function KanbanBoard({
   onStartTask,
   onCancelTask,
   onReviewTask,
+  onMergeTask,
+  mergingTaskId,
+  mergeStatus,
 }: KanbanBoardProps) {
   const tasksByStatus = COLUMN_ORDER.reduce(
     (acc, status) => {
@@ -64,6 +70,9 @@ export function KanbanBoard({
             onStartTask={onStartTask}
             onCancelTask={onCancelTask}
             onReviewTask={onReviewTask}
+            onMergeTask={onMergeTask}
+            mergingTaskId={mergingTaskId}
+            mergeStatus={mergeStatus}
           />
         ))}
       </div>

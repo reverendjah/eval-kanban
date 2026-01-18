@@ -1,6 +1,8 @@
 import { Task } from '../types/task';
 import { PreviewInfo } from '../types/review';
 import { Spinner, EmptyState } from './ui';
+import { useServerHealth } from '../hooks/useServerHealth';
+import { ServerStatusBadge } from './ServerStatusBadge';
 
 interface PreviewControlsProps {
   task: Task;
@@ -8,8 +10,12 @@ interface PreviewControlsProps {
   error: string | null;
   isStarting: boolean;
   isStopping: boolean;
+  isRestartingBackend: boolean;
+  isRestartingFrontend: boolean;
   onStart: () => void;
   onStop: () => void;
+  onRestartBackend: () => void;
+  onRestartFrontend: () => void;
 }
 
 export function PreviewControls({
@@ -18,9 +24,18 @@ export function PreviewControls({
   error,
   isStarting,
   isStopping,
+  isRestartingBackend,
+  isRestartingFrontend,
   onStart,
   onStop,
+  onRestartBackend,
+  onRestartFrontend,
 }: PreviewControlsProps) {
+  const health = useServerHealth(
+    status?.frontend_url ?? null,
+    status?.backend_url ?? null
+  );
+
   const WarningIcon = (
     <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -85,36 +100,23 @@ export function PreviewControls({
               )}
             </button>
 
-            <div className="flex items-center gap-2 text-sm">
-              <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-900/30 text-green-400 rounded">
-                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                Running
-              </span>
-            </div>
-
             <div className="flex items-center gap-3 ml-auto">
-              <a
-                href={status.frontend_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-400 hover:text-blue-300 hover:underline text-sm flex items-center gap-1"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-                Frontend ({status.frontend_port})
-              </a>
-              <a
-                href={status.backend_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-400 hover:text-blue-300 hover:underline text-sm flex items-center gap-1"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-                Backend ({status.backend_port})
-              </a>
+              <ServerStatusBadge
+                status={health.frontend}
+                label="Frontend"
+                url={status.frontend_url}
+                port={status.frontend_port}
+                onRestart={onRestartFrontend}
+                isRestarting={isRestartingFrontend}
+              />
+              <ServerStatusBadge
+                status={health.backend}
+                label="Backend"
+                url={status.backend_url}
+                port={status.backend_port}
+                onRestart={onRestartBackend}
+                isRestarting={isRestartingBackend}
+              />
             </div>
           </>
         )}

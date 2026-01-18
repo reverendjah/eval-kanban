@@ -370,4 +370,68 @@ describe('api.preview', () => {
       ).rejects.toThrow(ApiError);
     });
   });
+
+  describe('restart', () => {
+    it('should restart backend server', async () => {
+      const mockInfo = {
+        task_id: '550e8400-e29b-41d4-a716-446655440000',
+        backend_url: 'http://localhost:9901',
+        frontend_url: 'http://localhost:5200',
+        backend_port: 9901,
+        frontend_port: 5200,
+        status: 'starting',
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockInfo),
+      });
+
+      const result = await api.preview.restart('550e8400-e29b-41d4-a716-446655440000', 'backend');
+      expect(result.backend_port).toBe(9901);
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/tasks/550e8400-e29b-41d4-a716-446655440000/preview/restart/backend',
+        expect.objectContaining({
+          method: 'POST',
+        })
+      );
+    });
+
+    it('should restart frontend server', async () => {
+      const mockInfo = {
+        task_id: '550e8400-e29b-41d4-a716-446655440000',
+        backend_url: 'http://localhost:9900',
+        frontend_url: 'http://localhost:5201',
+        backend_port: 9900,
+        frontend_port: 5201,
+        status: 'starting',
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockInfo),
+      });
+
+      const result = await api.preview.restart('550e8400-e29b-41d4-a716-446655440000', 'frontend');
+      expect(result.frontend_port).toBe(5201);
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/tasks/550e8400-e29b-41d4-a716-446655440000/preview/restart/frontend',
+        expect.objectContaining({
+          method: 'POST',
+        })
+      );
+    });
+
+    it('should throw ApiError when no preview running', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: () => Promise.resolve({ error: 'No preview running for this task' }),
+      });
+
+      await expect(
+        api.preview.restart('nonexistent', 'backend')
+      ).rejects.toThrow(ApiError);
+    });
+  });
 });

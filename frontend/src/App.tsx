@@ -1,8 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { api } from './lib/api';
 import { KanbanBoard } from './components/KanbanBoard';
 import { CreateTaskModal } from './components/CreateTaskModal';
 import { LogPanel } from './components/LogPanel';
 import { ReviewPanel } from './components/ReviewPanel';
+import { TaskDetailsModal } from './components/TaskDetailsModal';
 import { Spinner } from './components/ui';
 import {
   useTasks,
@@ -11,15 +13,22 @@ import {
   useStartTask,
   useCancelTask,
   useMoveTask,
+  useUpdateTask,
+  useMergeTask,
 } from './hooks/useTasks';
-import { useWebSocket, LogEntry } from './hooks/useWebSocket';
+import { useWebSocket, LogEntry, setMergeEventHandlers, clearMergeEventHandlers, setRebuildEventHandlers, clearRebuildEventHandlers } from './hooks/useWebSocket';
 import { Task, TaskStatus } from './types/task';
 
 function App() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [detailsTask, setDetailsTask] = useState<Task | null>(null);
   const [reviewTask, setReviewTask] = useState<Task | null>(null);
   const [taskLogs, setTaskLogs] = useState<Record<string, LogEntry[]>>({});
+  const [mergingTaskId, setMergingTaskId] = useState<string | undefined>();
+  const [mergeStatus, setMergeStatus] = useState<string | undefined>();
+  const [rebuildStatus, setRebuildStatus] = useState<'idle' | 'building' | 'ready' | 'failed'>('idle');
+  const [rebuildMessage, setRebuildMessage] = useState<string>('');
 
   const { data: tasks = [], isLoading, error } = useTasks();
   const createTask = useCreateTask();
@@ -27,6 +36,8 @@ function App() {
   const startTask = useStartTask();
   const cancelTask = useCancelTask();
   const moveTask = useMoveTask();
+  const updateTask = useUpdateTask();
+  const mergeTask = useMergeTask();
 
   const handleLog = useCallback((taskId: string, entry: LogEntry) => {
     setTaskLogs((prev) => ({
@@ -44,6 +55,63 @@ function App() {
     onExecutionComplete: handleExecutionComplete,
   });
 
+  // Set up merge event handlers
+  useEffect(() => {
+    setMergeEventHandlers({
+      onMergeStarted: (taskId) => {
+        setMergingTaskId(taskId);
+        setMergeStatus('Starting merge...');
+      },
+      onMergeProgress: (taskId, status) => {
+        if (taskId === mergingTaskId) {
+          setMergeStatus(status);
+        }
+      },
+      onMergeComplete: (completedTaskId, _commit, message) => {
+        setMergingTaskId(undefined);
+        setMergeStatus(undefined);
+        // Close review panel if open for this task
+        if (reviewTask?.id === completedTaskId) {
+          setReviewTask(null);
+        }
+        // Show success toast (simple alert for now)
+        console.log('Merge complete:', message);
+      },
+      onMergeFailed: (_failedTaskId, error) => {
+        setMergingTaskId(undefined);
+        setMergeStatus(undefined);
+        console.error('Merge failed:', error);
+        alert(`Merge failed: ${error}`);
+      },
+    });
+
+    return () => clearMergeEventHandlers();
+  }, [mergingTaskId, reviewTask]);
+
+  // Set up rebuild event handlers
+  useEffect(() => {
+    setRebuildEventHandlers({
+      onRebuildStarted: () => {
+        setRebuildStatus('building');
+        setRebuildMessage('Building server...');
+      },
+      onRebuildProgress: (message) => {
+        setRebuildMessage(message);
+      },
+      onRebuildComplete: () => {
+        setRebuildStatus('ready');
+        setRebuildMessage('Build complete! Restart to apply changes.');
+      },
+      onRebuildFailed: (error) => {
+        setRebuildStatus('failed');
+        setRebuildMessage(`Build failed: ${error}`);
+        console.error('Rebuild failed:', error);
+      },
+    });
+
+    return () => clearRebuildEventHandlers();
+  }, []);
+
   const handleCreateTask = async (input: { title: string; description?: string }) => {
     await createTask.mutateAsync(input);
     setIsCreateModalOpen(false);
@@ -55,6 +123,9 @@ function App() {
       if (selectedTask?.id === id) {
         setSelectedTask(null);
       }
+      if (detailsTask?.id === id) {
+        setDetailsTask(null);
+      }
     }
   };
 
@@ -62,6 +133,7 @@ function App() {
     const task = tasks.find((t) => t.id === id);
     if (task) {
       setSelectedTask(task);
+      setDetailsTask(null); // Close details modal when starting
     }
     await startTask.mutateAsync(id);
   };
@@ -75,6 +147,25 @@ function App() {
   };
 
   const handleSelectTask = (task: Task) => {
+    // Open details modal instead of log panel
+    setDetailsTask(task);
+  };
+
+  const handleCloseDetailsModal = () => {
+    setDetailsTask(null);
+  };
+
+  const handleSaveTask = async (id: string, updates: { title?: string; description?: string }) => {
+    await updateTask.mutateAsync({ id, input: updates });
+    // Update detailsTask with new data
+    const updatedTask = tasks.find((t) => t.id === id);
+    if (updatedTask) {
+      setDetailsTask({ ...updatedTask, ...updates });
+    }
+  };
+
+  const handleViewLogs = (task: Task) => {
+    setDetailsTask(null);
     setSelectedTask(task);
   };
 
@@ -97,6 +188,14 @@ function App() {
 
   const handleCloseReviewPanel = () => {
     setReviewTask(null);
+  };
+
+  const handleMergeTask = async (id: string) => {
+    // Close review panel if open for this task
+    if (reviewTask?.id === id) {
+      setReviewTask(null);
+    }
+    await mergeTask.mutateAsync(id);
   };
 
   if (error) {
@@ -135,6 +234,54 @@ function App() {
         </div>
       </header>
 
+      {/* Rebuild Status Banner */}
+      {rebuildStatus === 'building' && (
+        <div className="bg-amber-600 text-white px-4 py-2 flex items-center justify-center gap-2">
+          <Spinner size="sm" />
+          <span>{rebuildMessage}</span>
+        </div>
+      )}
+      {rebuildStatus === 'ready' && (
+        <div className="bg-green-600 text-white px-4 py-2 flex items-center justify-center gap-4">
+          <span>{rebuildMessage}</span>
+          <button
+            onClick={async () => {
+              try {
+                await api.server.restart();
+                setRebuildStatus('idle');
+                // Wait a bit for the new server to start, then reload
+                setTimeout(() => {
+                  window.location.reload();
+                }, 3000);
+              } catch (error) {
+                console.error('Failed to restart server:', error);
+                alert('Failed to restart server. Please restart manually.');
+              }
+            }}
+            className="px-3 py-1 bg-white text-green-700 rounded font-medium hover:bg-green-100 transition-colors"
+          >
+            Restart Now
+          </button>
+          <button
+            onClick={() => setRebuildStatus('idle')}
+            className="text-green-200 hover:text-white transition-colors"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+      {rebuildStatus === 'failed' && (
+        <div className="bg-red-600 text-white px-4 py-2 flex items-center justify-center gap-4">
+          <span>{rebuildMessage}</span>
+          <button
+            onClick={() => setRebuildStatus('idle')}
+            className="text-red-200 hover:text-white transition-colors"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       <main className="flex-1 p-6 overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
@@ -149,6 +296,9 @@ function App() {
             onStartTask={handleStartTask}
             onCancelTask={handleCancelTask}
             onReviewTask={handleReviewTask}
+            onMergeTask={handleMergeTask}
+            mergingTaskId={mergingTaskId}
+            mergeStatus={mergeStatus}
           />
         )}
       </main>
@@ -171,6 +321,18 @@ function App() {
         <ReviewPanel
           task={reviewTask}
           onClose={handleCloseReviewPanel}
+          onMerge={handleMergeTask}
+        />
+      )}
+
+      {detailsTask && (
+        <TaskDetailsModal
+          task={detailsTask}
+          onClose={handleCloseDetailsModal}
+          onSave={handleSaveTask}
+          onDelete={handleDeleteTask}
+          onStart={handleStartTask}
+          onViewLogs={handleViewLogs}
         />
       )}
     </div>
