@@ -41,14 +41,19 @@ function getPlatformDir() {
   if (platform === 'linux' && arch === 'x64') return 'linux-x64';
   if (platform === 'linux' && arch === 'arm64') return 'linux-arm64';
   if (platform === 'win32' && arch === 'x64') return 'windows-x64';
-  if (platform === 'darwin' && arch === 'x64') return 'macos-x64';
   if (platform === 'darwin' && arch === 'arm64') return 'macos-arm64';
+
+  if (platform === 'darwin' && arch === 'x64') {
+    console.error('Intel Macs are not supported.');
+    console.error('eval-kanban requires Apple Silicon (M1 or later).');
+    process.exit(1);
+  }
 
   console.error(`Unsupported platform: ${platform}-${arch}`);
   console.error('Supported platforms:');
   console.error('  - Linux x64/ARM64');
   console.error('  - Windows x64');
-  console.error('  - macOS x64 (Intel) / ARM64 (Apple Silicon)');
+  console.error('  - macOS ARM64 (Apple Silicon M1+)');
   process.exit(1);
 }
 

@@ -27,10 +27,6 @@ jobs:
             platform: windows-x64
             binary: eval-kanban-server.exe
           - os: macos-latest
-            target: x86_64-apple-darwin
-            platform: macos-x64
-            binary: eval-kanban-server
-          - os: macos-latest
             target: aarch64-apple-darwin
             platform: macos-arm64
             binary: eval-kanban-server
