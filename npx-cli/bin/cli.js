@@ -39,7 +39,6 @@ function getPlatformDir() {
   const arch = getEffectiveArch();
 
   if (platform === 'linux' && arch === 'x64') return 'linux-x64';
-  if (platform === 'linux' && arch === 'arm64') return 'linux-arm64';
   if (platform === 'win32' && arch === 'x64') return 'windows-x64';
   if (platform === 'darwin' && arch === 'arm64') return 'macos-arm64';
 
@@ -49,9 +48,15 @@ function getPlatformDir() {
     process.exit(1);
   }
 
+  if (platform === 'linux' && arch === 'arm64') {
+    console.error('Linux ARM64 is not supported yet.');
+    console.error('Please use Linux x64 or open an issue for ARM64 support.');
+    process.exit(1);
+  }
+
   console.error(`Unsupported platform: ${platform}-${arch}`);
   console.error('Supported platforms:');
-  console.error('  - Linux x64/ARM64');
+  console.error('  - Linux x64');
   console.error('  - Windows x64');
   console.error('  - macOS ARM64 (Apple Silicon M1+)');
   process.exit(1);
