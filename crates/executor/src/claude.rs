@@ -34,26 +34,30 @@ impl ClaudeExecutor {
         Self { working_dir }
     }
 
+    #[cfg(windows)]
     pub async fn check_claude_installed() -> bool {
-        let result = if cfg!(windows) {
-            // On Windows, call node directly with the CLI script
-            // This ensures proper stdout capture (cmd.exe doesn't pipe correctly)
-            let node_path = Self::get_node_path();
-            let cli_path = Self::get_claude_cli_path();
-            tracing::debug!("[Claude] Using node: {}, cli: {}", node_path, cli_path);
-            Command::new(&node_path)
-                .arg(&cli_path)
-                .arg("--version")
-                .output()
-                .await
-        } else {
-            Command::new("claude")
-                .arg("--version")
-                .output()
-                .await
-        };
+        // On Windows, call node directly with the CLI script
+        // This ensures proper stdout capture (cmd.exe doesn't pipe correctly)
+        let node_path = Self::get_node_path();
+        let cli_path = Self::get_claude_cli_path();
+        tracing::debug!("[Claude] Using node: {}, cli: {}", node_path, cli_path);
+        Command::new(&node_path)
+            .arg(&cli_path)
+            .arg("--version")
+            .output()
+            .await
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    }
 
-        result.map(|o| o.status.success()).unwrap_or(false)
+    #[cfg(not(windows))]
+    pub async fn check_claude_installed() -> bool {
+        Command::new("claude")
+            .arg("--version")
+            .output()
+            .await
+            .map(|o| o.status.success())
+            .unwrap_or(false)
     }
 
     #[cfg(windows)]
@@ -87,6 +91,22 @@ impl ClaudeExecutor {
         }
     }
 
+    /// Create a Command for Claude CLI with platform-specific configuration.
+    #[cfg(windows)]
+    fn create_claude_command() -> Command {
+        let node_path = Self::get_node_path();
+        let cli_path = Self::get_claude_cli_path();
+        tracing::info!("[Claude] Using node: {}, cli: {}", node_path, cli_path);
+        let mut c = Command::new(&node_path);
+        c.arg(&cli_path);
+        c
+    }
+
+    #[cfg(not(windows))]
+    fn create_claude_command() -> Command {
+        Command::new("claude")
+    }
+
     pub async fn spawn(
         &self,
         prompt: &str,
@@ -108,18 +128,7 @@ impl ClaudeExecutor {
     /// This is more reliable than spawn_interactive for capturing stdout on Windows.
     /// Returns the raw stdout output as a string.
     pub async fn run_plan_mode(&self, prompt: &str) -> Result<String, ExecutorError> {
-        // On Windows, call node directly with the CLI script using full paths
-        // This ensures proper stdout capture (cmd.exe doesn't pipe correctly)
-        let mut cmd = if cfg!(windows) {
-            let node_path = Self::get_node_path();
-            let cli_path = Self::get_claude_cli_path();
-            tracing::info!("[Claude Plan] Using node: {}, cli: {}", node_path, cli_path);
-            let mut c = Command::new(&node_path);
-            c.arg(&cli_path);
-            c
-        } else {
-            Command::new("claude")
-        };
+        let mut cmd = Self::create_claude_command();
 
         // Use stream-json for structured output parsing
         let args = [
@@ -187,18 +196,7 @@ impl ClaudeExecutor {
         // Kept for API compatibility but will be replaced with re-spawn mechanism
         let (stdin_tx, _stdin_rx) = mpsc::channel::<String>(32);
 
-        // On Windows, call node directly with the CLI script using full paths
-        // This ensures proper stdout capture (cmd.exe doesn't pipe correctly)
-        let mut cmd = if cfg!(windows) {
-            let node_path = Self::get_node_path();
-            let cli_path = Self::get_claude_cli_path();
-            tracing::info!("[Claude] Using node: {}, cli: {}", node_path, cli_path);
-            let mut c = Command::new(&node_path);
-            c.arg(&cli_path);
-            c
-        } else {
-            Command::new("claude")
-        };
+        let mut cmd = Self::create_claude_command();
 
         // Build args based on mode
         // - Interactive (plan mode): needs stream-json for tool_use parsing
