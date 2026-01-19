@@ -16,7 +16,7 @@ mod plan_session;
 mod bundled_config;
 mod config_setup;
 
-use routes::{tasks_router, ws_handler, review_router, preview_router, plan_router, server_router};
+use routes::{chat_router, tasks_router, ws_handler, review_router, preview_router, plan_router, server_router};
 use state::AppState;
 
 const DEFAULT_PORT: u16 = 9847;
@@ -76,6 +76,7 @@ async fn main() {
     let api_routes = Router::new()
         .nest("/tasks", tasks_router())
         .nest("/plan", plan_router())
+        .nest("/chat", chat_router())
         .nest("/server", server_router())
         .merge(review_router())
         .merge(preview_router())

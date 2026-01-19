@@ -67,6 +67,13 @@ pub enum WsMessage {
     RebuildFailed {
         error: String,
     },
+    ChatChunk {
+        content: String,
+        is_complete: bool,
+    },
+    ChatError {
+        error: String,
+    },
     Ping,
     Pong,
 }

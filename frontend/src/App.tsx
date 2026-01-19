@@ -1,10 +1,11 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { api } from './lib/api';
 import { KanbanBoard } from './components/KanbanBoard';
 import { CreateTaskModal } from './components/CreateTaskModal';
 import { LogPanel } from './components/LogPanel';
 import { ReviewPanel } from './components/ReviewPanel';
 import { TaskDetailsModal } from './components/TaskDetailsModal';
+import { ChatSidebar } from './components/ChatSidebar';
 import { Spinner } from './components/ui';
 import {
   useTasks,
@@ -16,7 +17,7 @@ import {
   useUpdateTask,
   useMergeTask,
 } from './hooks/useTasks';
-import { useWebSocket, LogEntry, setMergeEventHandlers, clearMergeEventHandlers, setRebuildEventHandlers, clearRebuildEventHandlers } from './hooks/useWebSocket';
+import { useWebSocket, LogEntry, setMergeEventHandlers, clearMergeEventHandlers, setRebuildEventHandlers, clearRebuildEventHandlers, setChatEventHandlers, clearChatEventHandlers } from './hooks/useWebSocket';
 import { Task, TaskStatus } from './types/task';
 
 function App() {
@@ -30,6 +31,9 @@ function App() {
   const [rebuildStatus, setRebuildStatus] = useState<'idle' | 'building' | 'ready' | 'failed'>('idle');
   const [rebuildMessage, setRebuildMessage] = useState<string>('');
   const [projectName, setProjectName] = useState<string>('...');
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const chatChunkHandlerRef = useRef<(content: string, isComplete: boolean) => void>(() => {});
+  const chatErrorHandlerRef = useRef<(error: string) => void>(() => {});
 
   const { data: tasks = [], isLoading, error } = useTasks();
   const createTask = useCreateTask();
@@ -118,6 +122,20 @@ function App() {
     });
 
     return () => clearRebuildEventHandlers();
+  }, []);
+
+  // Set up chat event handlers
+  useEffect(() => {
+    setChatEventHandlers({
+      onChatChunk: (content, isComplete) => {
+        chatChunkHandlerRef.current(content, isComplete);
+      },
+      onChatError: (error) => {
+        chatErrorHandlerRef.current(error);
+      },
+    });
+
+    return () => clearChatEventHandlers();
   }, []);
 
   const handleCreateTask = async (input: { title: string; description?: string }) => {
@@ -343,6 +361,13 @@ function App() {
           onViewLogs={handleViewLogs}
         />
       )}
+
+      <ChatSidebar
+        isOpen={isChatOpen}
+        onToggle={() => setIsChatOpen(!isChatOpen)}
+        onChatChunk={(handler) => { chatChunkHandlerRef.current = handler; }}
+        onChatError={(handler) => { chatErrorHandlerRef.current = handler; }}
+      />
     </div>
   );
 }

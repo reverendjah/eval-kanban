@@ -94,6 +94,15 @@ const WsMessageSchema = z.discriminatedUnion('type', [
     error: z.string(),
   }),
   z.object({
+    type: z.literal('chat_chunk'),
+    content: z.string(),
+    is_complete: z.boolean(),
+  }),
+  z.object({
+    type: z.literal('chat_error'),
+    error: z.string(),
+  }),
+  z.object({
     type: z.literal('ping'),
   }),
   z.object({
@@ -128,6 +137,11 @@ export interface RebuildEventHandlers {
   onRebuildProgress?: (message: string) => void;
   onRebuildComplete?: () => void;
   onRebuildFailed?: (error: string) => void;
+}
+
+export interface ChatEventHandlers {
+  onChatChunk?: (content: string, isComplete: boolean) => void;
+  onChatError?: (error: string) => void;
 }
 
 interface UseWebSocketOptions {
@@ -166,6 +180,17 @@ export function setRebuildEventHandlers(handlers: RebuildEventHandlers) {
 
 export function clearRebuildEventHandlers() {
   rebuildEventHandlers = {};
+}
+
+// Global chat event listeners
+let chatEventHandlers: ChatEventHandlers = {};
+
+export function setChatEventHandlers(handlers: ChatEventHandlers) {
+  chatEventHandlers = handlers;
+}
+
+export function clearChatEventHandlers() {
+  chatEventHandlers = {};
 }
 
 export function useWebSocket(options: UseWebSocketOptions = {}) {
@@ -301,6 +326,14 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
         case 'rebuild_failed':
           rebuildEventHandlers.onRebuildFailed?.(message.error);
+          break;
+
+        case 'chat_chunk':
+          chatEventHandlers.onChatChunk?.(message.content, message.is_complete);
+          break;
+
+        case 'chat_error':
+          chatEventHandlers.onChatError?.(message.error);
           break;
 
         case 'ping':

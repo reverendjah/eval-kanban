@@ -5,6 +5,7 @@ use std::str::FromStr;
 pub mod models;
 
 pub use models::{Task, TaskStatus, CreateTask, UpdateTask};
+pub use models::chat::{ChatMessage, CreateChatMessage};
 
 #[derive(Debug, thiserror::Error)]
 pub enum DbError {
@@ -124,6 +125,28 @@ async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), DbError> {
             .await
             .map_err(|e| DbError::Migration(e.to_string()))?;
     }
+
+    // Migration 004: Create chat_messages table
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id TEXT PRIMARY KEY NOT NULL,
+            project_path TEXT NOT NULL,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            image_data TEXT,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        "#,
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| DbError::Migration(e.to_string()))?;
+
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_chat_messages_project ON chat_messages(project_path, created_at)")
+        .execute(pool)
+        .await
+        .map_err(|e| DbError::Migration(e.to_string()))?;
 
     tracing::info!("Database migrations completed");
     Ok(())

@@ -20,6 +20,13 @@ import {
   PlanSessionInfo,
   PlanSessionInfoSchema,
 } from '../types/plan';
+import {
+  ChatMessage,
+  ChatHistoryResponseSchema,
+  SendMessageRequest,
+  SendMessageResponseSchema,
+  ClearHistoryResponseSchema,
+} from '../types/chat';
 import { z } from 'zod';
 
 const StartPlanResponseSchema = z.object({
@@ -246,6 +253,32 @@ export const api = {
         method: 'POST',
       });
       await handleVoidResponse(response);
+    },
+  },
+
+  chat: {
+    getHistory: async (): Promise<ChatMessage[]> => {
+      const response = await fetch(`${API_BASE}/chat/history`);
+      const data = await handleResponse(response, ChatHistoryResponseSchema);
+      return data.messages;
+    },
+
+    sendMessage: async (request: SendMessageRequest): Promise<ChatMessage> => {
+      const response = await fetch(`${API_BASE}/chat/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      });
+      const data = await handleResponse(response, SendMessageResponseSchema);
+      return data.user_message;
+    },
+
+    clearHistory: async (): Promise<number> => {
+      const response = await fetch(`${API_BASE}/chat/history`, {
+        method: 'DELETE',
+      });
+      const data = await handleResponse(response, ClearHistoryResponseSchema);
+      return data.deleted_count;
     },
   },
 };
