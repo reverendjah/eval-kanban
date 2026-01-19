@@ -734,6 +734,20 @@ async fn merge_task(
 }
 
 async fn trigger_rebuild(state: Arc<AppState>) {
+    // Only rebuild if this is the eval-kanban project itself
+    let cargo_toml = state.working_dir.join("Cargo.toml");
+    if !cargo_toml.exists() {
+        tracing::debug!("Skipping rebuild: not a Cargo project");
+        return;
+    }
+
+    // Check if this is specifically eval-kanban (has the server crate)
+    let server_crate = state.working_dir.join("crates/server/Cargo.toml");
+    if !server_crate.exists() {
+        tracing::debug!("Skipping rebuild: not the eval-kanban project");
+        return;
+    }
+
     tracing::info!("Starting server rebuild after merge");
 
     // Broadcast rebuild started
