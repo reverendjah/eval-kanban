@@ -2,11 +2,52 @@
 
 Kanban board for orchestrating tasks with Claude Code.
 
+## Quick Start
+
+```bash
+npx eval-kanban
+```
+
+That's it! The server will start and open your browser automatically.
+
+### Supported Platforms
+
+| Platform | Status |
+|----------|--------|
+| Linux x64 | Supported |
+| Windows x64 | Supported |
+| macOS ARM64 (M1+) | Supported |
+| macOS Intel | Not supported |
+| Linux ARM64 | Not supported |
+
 ## Prerequisites
 
-- **Rust** (1.70+) - https://rustup.rs
 - **Node.js** (18+) - https://nodejs.org
 - **Claude Code** - `npm install -g @anthropic-ai/claude-code`
+
+For development only:
+- **Rust** (1.70+) - https://rustup.rs
+
+## Data Storage
+
+All data is stored in `~/.eval-kanban/`:
+
+```
+~/.eval-kanban/
+├── db.sqlite      # Task database (YOUR DATA!)
+├── worktrees/     # Git worktrees for task execution
+└── bin/           # Downloaded binaries (cache)
+```
+
+### Clearing Cache
+
+To clear the binary cache (e.g., to force re-download):
+
+```bash
+rm -rf ~/.eval-kanban/bin
+```
+
+> **WARNING:** Do NOT delete the entire `~/.eval-kanban/` directory! This will permanently delete all your tasks. Only delete the `bin/` subdirectory if you need to clear the cache.
 
 ## Development Setup
 
@@ -47,15 +88,17 @@ eval-kanban/
 └── npx-cli/          # NPX wrapper (for future distribution)
 ```
 
-## Features (MVP - Phase 1)
+## Features
 
-- [x] Kanban board with 4 columns (To Do, In Progress, Review, Done)
-- [x] Create tasks with title and description
-- [x] Drag-and-drop between columns
-- [x] Start task execution with Claude Code
-- [x] Real-time log streaming via WebSocket
-- [x] SQLite persistence
-- [x] Auto-open browser on startup
+- Kanban board with 4 columns (To Do → In Progress → Review → Done)
+- Drag-and-drop between columns
+- Task execution with Claude Code
+- Real-time log streaming via WebSocket
+- Plan Mode - interactive planning with Q&A before execution
+- Review Mode - diff viewer with merge to main
+- Git worktree isolation per task
+- Auto-rebuild after merge
+- SQLite persistence
 
 ## API Endpoints
 
@@ -68,11 +111,6 @@ eval-kanban/
 | POST | /api/tasks/:id/start | Start task execution |
 | POST | /api/tasks/:id/cancel | Cancel running task |
 | WS | /api/ws | WebSocket for real-time updates |
-
-## Configuration
-
-Data is stored in `~/.eval-kanban/`:
-- `db.sqlite` - Task database
 
 ## License
 

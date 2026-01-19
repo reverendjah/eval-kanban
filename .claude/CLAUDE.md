@@ -11,6 +11,29 @@ FAZER, nao perguntar. BUSCAR, nao pedir contexto.
 
 ---
 
+## AVISO CRITICO: Dados do Usuario
+
+O diretorio `~/.eval-kanban/` contem dados criticos:
+
+```
+~/.eval-kanban/
+├── db.sqlite      # BANCO DE DADOS - TODAS AS TASKS DO USUARIO
+├── worktrees/     # Git worktrees das tasks em execucao
+└── bin/           # Cache dos binarios (seguro apagar)
+```
+
+### NUNCA FAZER:
+```bash
+rm -rf ~/.eval-kanban    # PERDA TOTAL DE DADOS!
+```
+
+### Comando CORRETO para limpar cache:
+```bash
+rm -rf ~/.eval-kanban/bin    # Apenas cache, dados preservados
+```
+
+---
+
 ## Arquitetura
 
 ### Stack

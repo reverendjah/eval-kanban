@@ -1,6 +1,6 @@
 {
   "name": "eval-kanban",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Kanban board for orchestrating tasks with Claude Code",
   "bin": {
     "eval-kanban": "./bin/cli.js"

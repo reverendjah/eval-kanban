@@ -13,6 +13,8 @@ use eval_kanban_db::Task;
 mod routes;
 mod state;
 mod plan_session;
+mod bundled_config;
+mod config_setup;
 
 use routes::{tasks_router, ws_handler, review_router, preview_router, plan_router, server_router};
 use state::AppState;
@@ -31,6 +33,27 @@ async fn main() {
 
     let working_dir = std::env::current_dir().expect("Failed to get current directory");
     tracing::info!("Working directory: {}", working_dir.display());
+
+    // Setup Claude configuration (GLOBAL ~/.claude/ + LOCAL project/.claude/)
+    match config_setup::ensure_config(&working_dir) {
+        Ok(result) => {
+            if result.global_created {
+                tracing::info!("Created global Claude config (~/.claude/)");
+            }
+            if result.global_updated {
+                tracing::info!("Updated global Claude config");
+            }
+            if result.local_created {
+                tracing::info!("Created local Claude config (.claude/)");
+            }
+            if result.local_updated {
+                tracing::info!("Updated local Claude config");
+            }
+        }
+        Err(e) => {
+            tracing::warn!("Failed to setup Claude config: {}. Continuing anyway.", e);
+        }
+    }
 
     let db = match eval_kanban_db::init_db().await {
         Ok(pool) => pool,

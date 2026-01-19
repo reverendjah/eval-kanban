@@ -30,25 +30,29 @@ async function fetchJson(url) {
 
 async function downloadFile(url, destPath, onProgress) {
   const tempPath = destPath + '.tmp';
+
   return new Promise((resolve, reject) => {
-    const file = fs.createWriteStream(tempPath);
+    let file = null;
 
     const cleanup = () => {
-      try {
-        fs.unlinkSync(tempPath);
-      } catch {}
+      if (file) {
+        try { file.close(); } catch {}
+      }
+      try { fs.unlinkSync(tempPath); } catch {}
     };
 
     const doRequest = (requestUrl) => {
+      // Create new WriteStream for each request (including after redirects)
+      file = fs.createWriteStream(tempPath);
+
       https.get(requestUrl, { headers: { 'User-Agent': 'eval-kanban-cli' } }, (res) => {
         if (res.statusCode === 301 || res.statusCode === 302) {
           file.close();
-          cleanup();
+          // Don't cleanup here - just close the stream and follow redirect
           return doRequest(res.headers.location);
         }
 
         if (res.statusCode !== 200) {
-          file.close();
           cleanup();
           return reject(new Error(`HTTP ${res.statusCode} downloading ${requestUrl}`));
         }
@@ -60,6 +64,7 @@ async function downloadFile(url, destPath, onProgress) {
           downloadedSize += chunk.length;
           if (onProgress) onProgress(downloadedSize, totalSize);
         });
+
         res.pipe(file);
 
         file.on('finish', () => {
@@ -73,7 +78,6 @@ async function downloadFile(url, destPath, onProgress) {
           }
         });
       }).on('error', (err) => {
-        file.close();
         cleanup();
         reject(err);
       });

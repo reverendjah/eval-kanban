@@ -274,6 +274,41 @@ fn create_worktree_sync(
         branch_name
     );
 
+    // Copy .claude/ directory from main repo to worktree
+    let source_claude = repo_path.join(".claude");
+    let dest_claude = worktree_path.join(".claude");
+
+    if source_claude.exists() && source_claude.is_dir() {
+        match copy_dir_recursive(&source_claude, &dest_claude) {
+            Ok(_) => {
+                tracing::info!("Copied .claude/ to worktree");
+            }
+            Err(e) => {
+                tracing::warn!("Failed to copy .claude/ to worktree: {}. Claude may have limited functionality.", e);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Recursively copy a directory and its contents.
+fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+
+        if file_type.is_dir() {
+            copy_dir_recursive(&src_path, &dst_path)?;
+        } else {
+            std::fs::copy(&src_path, &dst_path)?;
+        }
+    }
+
     Ok(())
 }
 
