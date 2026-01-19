@@ -97,6 +97,34 @@ async fn run_migrations(pool: &Pool<Sqlite>) -> Result<(), DbError> {
             .map_err(|e| DbError::Migration(e.to_string()))?;
     }
 
+    // Migration 003: Add project_path for multi-project isolation
+    if !column_names.contains(&"project_path") {
+        sqlx::query("ALTER TABLE tasks ADD COLUMN project_path TEXT")
+            .execute(pool)
+            .await
+            .map_err(|e| DbError::Migration(e.to_string()))?;
+
+        // Delete orphan tasks (tasks without project_path)
+        // These are from before multi-project support
+        let deleted = sqlx::query("DELETE FROM tasks WHERE project_path IS NULL")
+            .execute(pool)
+            .await
+            .map_err(|e| DbError::Migration(e.to_string()))?;
+
+        if deleted.rows_affected() > 0 {
+            tracing::info!(
+                "Deleted {} orphan tasks without project_path",
+                deleted.rows_affected()
+            );
+        }
+
+        // Create index for faster project filtering
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_tasks_project_path ON tasks(project_path)")
+            .execute(pool)
+            .await
+            .map_err(|e| DbError::Migration(e.to_string()))?;
+    }
+
     tracing::info!("Database migrations completed");
     Ok(())
 }

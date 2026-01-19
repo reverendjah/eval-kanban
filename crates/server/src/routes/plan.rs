@@ -742,11 +742,13 @@ async fn execute_plan(
     // Create the task
     use eval_kanban_db::{CreateTask, Task};
 
+    let project_path = state.working_dir.to_string_lossy().to_string();
     let task = Task::create(
         &state.db,
         CreateTask {
             title: req.title,
             description: Some(full_description),
+            project_path,
         },
     )
     .await

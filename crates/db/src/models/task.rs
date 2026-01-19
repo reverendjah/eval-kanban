@@ -48,6 +48,7 @@ pub struct TaskRow {
     pub error_message: Option<String>,
     pub branch_name: Option<String>,
     pub worktree_path: Option<String>,
+    pub project_path: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -61,6 +62,7 @@ pub struct Task {
     pub error_message: Option<String>,
     pub branch_name: Option<String>,
     pub worktree_path: Option<String>,
+    pub project_path: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -75,6 +77,7 @@ impl From<TaskRow> for Task {
             error_message: row.error_message,
             branch_name: row.branch_name,
             worktree_path: row.worktree_path,
+            project_path: row.project_path,
             created_at: row.created_at,
             updated_at: row.updated_at,
         }
@@ -85,6 +88,7 @@ impl From<TaskRow> for Task {
 pub struct CreateTask {
     pub title: String,
     pub description: Option<String>,
+    pub project_path: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -104,13 +108,14 @@ impl Task {
 
         sqlx::query(
             r#"
-            INSERT INTO tasks (id, title, description, status, created_at, updated_at)
-            VALUES (?, ?, ?, 'todo', ?, ?)
+            INSERT INTO tasks (id, title, description, status, project_path, created_at, updated_at)
+            VALUES (?, ?, ?, 'todo', ?, ?, ?)
             "#,
         )
         .bind(&id)
         .bind(&input.title)
         .bind(&input.description)
+        .bind(&input.project_path)
         .bind(now)
         .bind(now)
         .execute(pool)
@@ -124,6 +129,7 @@ impl Task {
             error_message: None,
             branch_name: None,
             worktree_path: None,
+            project_path: Some(input.project_path),
             created_at: now,
             updated_at: now,
         })
@@ -131,7 +137,7 @@ impl Task {
 
     pub async fn find_by_id(pool: &Pool<Sqlite>, id: &str) -> Result<Option<Task>, sqlx::Error> {
         let row: Option<TaskRow> = sqlx::query_as(
-            "SELECT id, title, description, status, error_message, branch_name, worktree_path, created_at, updated_at FROM tasks WHERE id = ?"
+            "SELECT id, title, description, status, error_message, branch_name, worktree_path, project_path, created_at, updated_at FROM tasks WHERE id = ?"
         )
         .bind(id)
         .fetch_optional(pool)
@@ -142,8 +148,19 @@ impl Task {
 
     pub async fn find_all(pool: &Pool<Sqlite>) -> Result<Vec<Task>, sqlx::Error> {
         let rows: Vec<TaskRow> = sqlx::query_as(
-            "SELECT id, title, description, status, error_message, branch_name, worktree_path, created_at, updated_at FROM tasks ORDER BY created_at DESC"
+            "SELECT id, title, description, status, error_message, branch_name, worktree_path, project_path, created_at, updated_at FROM tasks ORDER BY created_at DESC"
         )
+        .fetch_all(pool)
+        .await?;
+
+        Ok(rows.into_iter().map(Task::from).collect())
+    }
+
+    pub async fn find_all_by_project(pool: &Pool<Sqlite>, project_path: &str) -> Result<Vec<Task>, sqlx::Error> {
+        let rows: Vec<TaskRow> = sqlx::query_as(
+            "SELECT id, title, description, status, error_message, branch_name, worktree_path, project_path, created_at, updated_at FROM tasks WHERE project_path = ? ORDER BY created_at DESC"
+        )
+        .bind(project_path)
         .fetch_all(pool)
         .await?;
 
@@ -196,6 +213,7 @@ impl Task {
             error_message,
             branch_name,
             worktree_path,
+            project_path: existing.project_path,
             created_at: existing.created_at,
             updated_at: now,
         }))
@@ -293,6 +311,7 @@ mod tests {
                 error_message TEXT,
                 branch_name TEXT,
                 worktree_path TEXT,
+                project_path TEXT,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
@@ -314,6 +333,7 @@ mod tests {
             CreateTask {
                 title: "Test Task".to_string(),
                 description: Some("Test Description".to_string()),
+                project_path: "/test/project".to_string(),
             },
         )
         .await
@@ -334,6 +354,7 @@ mod tests {
             CreateTask {
                 title: "Find Me".to_string(),
                 description: None,
+                project_path: "/test/project".to_string(),
             },
         )
         .await
@@ -356,6 +377,7 @@ mod tests {
             CreateTask {
                 title: "Task 1".to_string(),
                 description: None,
+                project_path: "/test/project".to_string(),
             },
         )
         .await
@@ -366,6 +388,7 @@ mod tests {
             CreateTask {
                 title: "Task 2".to_string(),
                 description: None,
+                project_path: "/test/project".to_string(),
             },
         )
         .await
@@ -384,6 +407,7 @@ mod tests {
             CreateTask {
                 title: "Original".to_string(),
                 description: None,
+                project_path: "/test/project".to_string(),
             },
         )
         .await
@@ -419,6 +443,7 @@ mod tests {
             CreateTask {
                 title: "Worktree Test".to_string(),
                 description: None,
+                project_path: "/test/project".to_string(),
             },
         )
         .await
@@ -447,6 +472,7 @@ mod tests {
             CreateTask {
                 title: "Delete Me".to_string(),
                 description: None,
+                project_path: "/test/project".to_string(),
             },
         )
         .await
@@ -468,6 +494,7 @@ mod tests {
             CreateTask {
                 title: "Status Test".to_string(),
                 description: None,
+                project_path: "/test/project".to_string(),
             },
         )
         .await
@@ -490,6 +517,7 @@ mod tests {
             CreateTask {
                 title: "Error Test".to_string(),
                 description: None,
+                project_path: "/test/project".to_string(),
             },
         )
         .await

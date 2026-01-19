@@ -1,17 +1,37 @@
 use std::sync::Arc;
 use std::time::Duration;
 use axum::{
-    Router,
+    Json, Router,
     extract::State,
     http::StatusCode,
-    routing::post,
+    routing::{get, post},
 };
+use serde::Serialize;
 
 use crate::state::AppState;
 
+#[derive(Serialize)]
+pub struct ServerInfo {
+    name: String,
+    path: String,
+}
+
 pub fn server_router() -> Router<Arc<AppState>> {
     Router::new()
+        .route("/info", get(get_info))
         .route("/restart", post(restart_server))
+}
+
+async fn get_info(
+    State(state): State<Arc<AppState>>,
+) -> Json<ServerInfo> {
+    let path = state.working_dir.to_string_lossy().to_string();
+    let name = state.working_dir
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "root".to_string());
+
+    Json(ServerInfo { name, path })
 }
 
 async fn restart_server(

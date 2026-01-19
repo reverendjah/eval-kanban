@@ -43,6 +43,16 @@ const ExecutePlanResponseSchema = z.object({
   message: z.string(),
 });
 
+const ServerInfoSchema = z.object({
+  name: z.string(),
+  path: z.string(),
+});
+
+export interface ServerInfo {
+  name: string;
+  path: string;
+}
+
 const API_BASE = '/api';
 
 class ApiError extends Error {
@@ -226,6 +236,11 @@ export const api = {
   },
 
   server: {
+    getInfo: async (): Promise<ServerInfo> => {
+      const response = await fetch(`${API_BASE}/server/info`);
+      return handleResponse(response, ServerInfoSchema);
+    },
+
     restart: async (): Promise<void> => {
       const response = await fetch(`${API_BASE}/server/restart`, {
         method: 'POST',

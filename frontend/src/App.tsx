@@ -29,6 +29,7 @@ function App() {
   const [mergeStatus, setMergeStatus] = useState<string | undefined>();
   const [rebuildStatus, setRebuildStatus] = useState<'idle' | 'building' | 'ready' | 'failed'>('idle');
   const [rebuildMessage, setRebuildMessage] = useState<string>('');
+  const [projectName, setProjectName] = useState<string>('...');
 
   const { data: tasks = [], isLoading, error } = useTasks();
   const createTask = useCreateTask();
@@ -54,6 +55,13 @@ function App() {
     onLog: handleLog,
     onExecutionComplete: handleExecutionComplete,
   });
+
+  // Fetch project info on mount
+  useEffect(() => {
+    api.server.getInfo()
+      .then((info) => setProjectName(info.name))
+      .catch(() => setProjectName('eval-kanban'));
+  }, []);
 
   // Set up merge event handlers
   useEffect(() => {
@@ -214,7 +222,7 @@ function App() {
       <header className="border-b border-gray-700 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold text-white">eval-kanban 🎉</h1>
+            <h1 className="text-2xl font-bold text-white">{projectName}</h1>
             <span
               className={`h-2 w-2 rounded-full ${
                 isConnected ? 'bg-green-500' : 'bg-red-500'

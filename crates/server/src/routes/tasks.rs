@@ -56,7 +56,8 @@ pub fn tasks_router() -> Router<Arc<AppState>> {
 async fn list_tasks(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<TasksResponse>, (StatusCode, Json<ErrorResponse>)> {
-    let tasks = Task::find_all(&state.db).await.map_err(|e| {
+    let project_path = state.working_dir.to_string_lossy().to_string();
+    let tasks = Task::find_all_by_project(&state.db, &project_path).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse {
@@ -105,11 +106,13 @@ async fn create_task(
         ));
     }
 
+    let project_path = state.working_dir.to_string_lossy().to_string();
     let task = Task::create(
         &state.db,
         CreateTask {
             title: req.title,
             description: req.description,
+            project_path,
         },
     )
     .await
