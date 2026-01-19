@@ -19,6 +19,7 @@ type TabType = 'diff' | 'preview';
 export function ReviewPanel({ task, onClose, onMerge }: ReviewPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>('diff');
   const [mergeError, setMergeError] = useState<string | null>(null);
+  const [showMergeConfirm, setShowMergeConfirm] = useState(false);
   const { data: diff, isLoading: diffLoading, error: diffError } = useDiff(task.id);
   const preview = usePreview(task.id);
   const mergeTask = useMergeTask();
@@ -93,7 +94,7 @@ export function ReviewPanel({ task, onClose, onMerge }: ReviewPanelProps) {
 
             {/* Approve & Merge button */}
             <button
-              onClick={handleApproveAndMerge}
+              onClick={() => setShowMergeConfirm(true)}
               disabled={mergeTask.isPending}
               data-testid="approve-merge-button"
               className={clsx(
@@ -135,6 +136,40 @@ export function ReviewPanel({ task, onClose, onMerge }: ReviewPanelProps) {
             </div>
           )}
         </header>
+
+        {/* Merge Confirmation Dialog */}
+        {showMergeConfirm && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+            <div className="bg-[#1e293b] rounded-lg p-6 max-w-md border border-gray-600 shadow-xl">
+              <h3 className="text-white font-semibold text-lg mb-2">
+                Confirm Merge
+              </h3>
+              <p className="text-gray-300 mb-4">
+                Merge branch <code className="bg-gray-800 px-1 rounded">{task.branch_name}</code> to main?
+              </p>
+              <p className="text-amber-400 text-sm mb-4">
+                This action cannot be undone.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowMergeConfirm(false)}
+                  className="px-4 py-2 text-gray-300 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setShowMergeConfirm(false);
+                    handleApproveAndMerge();
+                  }}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                >
+                  Confirm Merge
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Content */}
         <main className="flex-1 overflow-hidden">
